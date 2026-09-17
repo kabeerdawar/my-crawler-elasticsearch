@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Investor Discovery</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, sans-serif; background: #f4f6fa; color: #172033; }
+  .container { max-width: 1700px; margin: auto; padding: 35px; }
+  h1 { margin: 0; font-size: 32px; }
+  .subtitle { color: #667085; margin-top: 8px; }
+  .search-box { background: white; padding: 22px; border-radius: 14px; margin-top: 25px; box-shadow: 0 3px 12px rgba(0,0,0,0.06); }
+  .input-row { display: flex; gap: 12px; }
+  input[type=text] { flex: 1; padding: 14px; border: 1px solid #ccd2dc; border-radius: 9px; font-size: 15px; }
+  button { padding: 14px 24px; border: none; border-radius: 9px; background: #111827; color: white; font-weight: 600; cursor: pointer; }
+  button:hover { opacity: 0.9; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary { background: #2563eb; }
+  .status { margin-top: 14px; font-weight: 600; color: #374151; }
+  .examples { margin-top: 12px; font-size: 13px; color: #667085; }
+  .examples span { display: inline-block; padding: 4px 10px; background: #eef2f7; border-radius: 12px; margin-right: 6px; margin-top: 6px; cursor: pointer; }
+  .examples span:hover { background: #dbe4ee; }
+  .panel { background: white; border-radius: 14px; padding: 20px; margin-top: 20px; box-shadow: 0 3px 12px rgba(0,0,0,0.06); }
+  .panel h2 { margin: 0 0 12px; font-size: 18px; }
+  .source-list { max-height: 320px; overflow-y: auto; }
+  .source-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #eef2f7; font-size: 14px; }
+  .source-row:last-child { border-bottom: none; }
+  .source-domain { font-weight: 600; min-width: 260px; }
+  .source-meta { color: #667085; font-size: 12px; flex: 1; }
+  .source-score { background: #eef2f7; padding: 2px 8px; border-radius: 8px; font-size: 12px; font-weight: 600; }
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 25px 0; }
+  .card { background: white; padding: 22px; border-radius: 14px; box-shadow: 0 3px 12px rgba(0,0,0,0.06); }
+  .card-title { color: #667085; font-size: 14px; }
+  .card-value { font-size: 30px; font-weight: bold; margin-top: 7px; }
+  .filters { background: white; padding: 16px; border-radius: 14px; margin: 15px 0; display: flex; gap: 10px; flex-wrap: wrap; }
+  .filters input { max-width: 400px; }
+  select { padding: 12px; border: 1px solid #ccd2dc; border-radius: 9px; background: white; }
+  .table-container { background: white; border-radius: 14px; overflow-x: auto; box-shadow: 0 3px 12px rgba(0,0,0,0.06); }
+  table { width: 100%; border-collapse: collapse; min-width: 1800px; }
+  th { background: #111827; color: white; padding: 14px; text-align: left; font-size: 13px; }
+  td { padding: 14px; border-bottom: 1px solid #e5e7eb; vertical-align: top; font-size: 13px; }
+  tr:hover { background: #fafafa; }
+  a { color: #2563eb; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .empty { text-align: center; padding: 45px; color: #667085; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+  .badge.green { background: #d1fae5; color: #047857; }
+  .badge.yellow { background: #fef3c7; color: #92400e; }
+  .badge.gray { background: #e5e7eb; color: #374151; }
+  .badge.blue { background: #dbeafe; color: #1d4ed8; }
+  .badge.red { background: #fee2e2; color: #b91c1c; }
+  @media (max-width: 900px) {
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .input-row, .filters { flex-direction: column; }
+    .filters input { max-width: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <h1>Investor Discovery</h1>
+  <p class="subtitle">Describe the investors you're looking for. The system finds public sources and crawls them.</p>
+
+  <div class="search-box">
+    <div class="input-row">
+      <input id="queryInput" type="text" placeholder="What investors are you looking for?" />
+      <button id="discoverBtn" onclick="discover()">Find Sources</button>
+    </div>
+    <div class="examples">
+      Try:
+      <span onclick="useExample('investors in Delhi')">investors in Delhi</span>
+      <span onclick="useExample('investors in San Francisco')">investors in San Francisco</span>
+      <span onclick="useExample('European investors')">European investors</span>
+      <span onclick="useExample('Indian fintech angel investors')">Indian fintech angels</span>
+      <span onclick="useExample('US AI seed investors')">US AI seed</span>
+    </div>
+    <div id="status" class="status"></div>
+  </div>
+
+  <div id="sourcesPanel" class="panel" style="display:none;">
+    <h2>Discovered Sources <span id="sourcesCount" style="color:#667085;font-weight:400;font-size:14px;"></span></h2>
+    <div class="source-list" id="sourceList"></div>
+    <div style="margin-top:14px;">
+      <button id="crawlBtn" class="secondary" onclick="crawlSelected()">Crawl Selected Sources</button>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="card-title">Investor Records</div><div id="recordCount" class="card-value">0</div></div>
+    <div class="card"><div class="card-title">HIGH Confidence</div><div id="highCount" class="card-value">0</div></div>
+    <div class="card"><div class="card-title">Emails Found</div><div id="emailCount" class="card-value">0</div></div>
+    <div class="card"><div class="card-title">Fresh (2024+)</div><div id="freshCount" class="card-value">0</div></div>
+  </div>
+
+  <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:15px;">
+    <button onclick="downloadCSV()">Download CSV</button>
+    <button onclick="downloadEmailsCSV()" class="secondary">Download Emails Only</button>
+    <button onclick="downloadLinkedInCSV()" class="secondary">Download LinkedIn Only</button>
+  </div>
+
+  <div class="filters">
+    <input id="searchInput" type="text" placeholder="Search results..." oninput="filterResults()" />
+    <select id="typeFilter" onchange="filterResults()"><option value="">All Investor Types</option></select>
+    <select id="regionFilter" onchange="filterResults()"><option value="">All Regions</option></select>
+    <select id="emailFilter" onchange="filterResults()">
+      <option value="">All Records</option>
+      <option value="has">Has Email</option>
+      <option value="strong">Strong Email (score ≥ 5)</option>
+      <option value="verified">Verified Email (mailto)</option>
+    </select>
+    <select id="linkedinFilter" onchange="filterResults()">
+      <option value="">All LinkedIn</option>
+      <option value="has">Has LinkedIn</option>
+      <option value="personal">Personal Profile (score = 5)</option>
+      <option value="strong">Strong LinkedIn (score ≥ 3)</option>
+    </select>
+    <select id="confidenceFilter" onchange="filterResults()">
+      <option value="">All Confidence</option>
+      <option value="HIGH">HIGH only</option>
+      <option value="MEDIUM">MEDIUM only</option>
+    </select>
+    <select id="sortFilter" onchange="filterResults()">
+      <option value="score">Sort: Investor Score</option>
+      <option value="email">Sort: Email Score</option>
+      <option value="linkedin">Sort: LinkedIn Score</option>
+      <option value="combined">Sort: Combined Contact Score</option>
+      <option value="confidence">Sort: Confidence (HIGH first)</option>
+    </select>
+  </div>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th><th>Company</th><th>Investor Type</th><th>Region</th>
+          <th>Sectors</th><th>Tags</th><th>Emails</th><th>LinkedIn</th>
+          <th>Investor Score</th><th>Email Score</th><th>LinkedIn Score</th>
+          <th>Confidence</th><th>Fresh</th><th>Source</th>
+        </tr>
+      </thead>
+      <tbody id="resultsBody">
+        <tr><td colspan="14" class="empty">Enter a query above to discover investors.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+let allResults = [];
+let discoveredSources = [];
+
+function useExample(text) {
+  document.getElementById("queryInput").value = text;
+  discover();
+}
+
+async function discover() {
+  const query = document.getElementById("queryInput").value.trim();
+  const btn = document.getElementById("discoverBtn");
+  const status = document.getElementById("status");
+
+  if (!query) { status.textContent = "Please enter a query."; return; }
+
+  btn.disabled = true;
+  btn.textContent = "Searching...";
+  status.textContent = "Parsing query and finding sources...";
+
+  try {
+    const res = await fetch("/discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Discovery failed");
+
+    discoveredSources = data.sources || [];
+    status.textContent = `Found ${discoveredSources.length} sources out of ${data.totalConsidered} considered.`;
+    renderSources();
+  } catch (err) {
+    status.textContent = "Error: " + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Find Sources";
+  }
+}
+
+function renderSources() {
+  const panel = document.getElementById("sourcesPanel");
+  const list = document.getElementById("sourceList");
+  const count = document.getElementById("sourcesCount");
+
+  if (discoveredSources.length === 0) { panel.style.display = "none"; return; }
+
+  panel.style.display = "block";
+  count.textContent = `(${discoveredSources.length})`;
+
+  list.innerHTML = discoveredSources.map((s, i) => `
+    <div class="source-row">
+      <input type="checkbox" id="src_${i}" checked />
+      <span class="source-domain">${escapeHtml(s.domain)}${s.hq_city ? ` <span style="color:#667085;font-weight:400;">(${escapeHtml(s.hq_city)})</span>` : ""}</span>
+      <span class="source-meta">${escapeHtml(s.reasons.join(" • "))}</span>
+      <span class="source-score">${s.score}</span>
+    </div>
+  `).join("");
+}
+
+async function crawlSelected() {
+  const selected = [];
+  discoveredSources.forEach((s, i) => {
+    const cb = document.getElementById("src_" + i);
+    if (cb && cb.checked) selected.push(s.url);
+  });
+
+  if (selected.length === 0) { alert("Select at least one source."); return; }
+
+  const btn = document.getElementById("crawlBtn");
+  const status = document.getElementById("status");
+
+  btn.disabled = true;
+  btn.textContent = "Crawling...";
+  status.textContent = `Crawling ${selected.length} sources. Please wait...`;
+
+  try {
+    const res = await fetch("/crawl", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ urls: selected, query: document.getElementById("queryInput").value.trim() })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Crawl failed");
+
+    allResults = data.results || [];
+    status.textContent = `Done — ${data.uniqueCount} unique records from ${data.rawCount} raw.`;
+
+    updateDashboard();
+    populateFilters();
+    filterResults();
+  } catch (err) {
+    status.textContent = "Error: " + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Crawl Selected Sources";
+  }
+}
+
+function updateDashboard() {
+  document.getElementById("recordCount").textContent = allResults.length;
+  document.getElementById("highCount").textContent =
+    allResults.filter(r => r.confidence === "HIGH").length;
+  document.getElementById("emailCount").textContent =
+    allResults.filter(r => r.emails && r.emails.length > 0).length;
+  document.getElementById("freshCount").textContent =
+    allResults.filter(r => r.is_fresh).length;
+}
+
+function populateFilters() {
+  const typeFilter = document.getElementById("typeFilter");
+  const regionFilter = document.getElementById("regionFilter");
+  typeFilter.innerHTML = '<option value="">All Investor Types</option>';
+  regionFilter.innerHTML = '<option value="">All Regions</option>';
+
+  [...new Set(allResults.map(r => r.investor_type).filter(Boolean))]
+    .forEach(t => typeFilter.appendChild(new Option(t, t)));
+
+  const regionTags = [...new Set(
+    allResults.map(r => r.hq_city ? `${r.region} (${r.hq_city})` : (r.region || "")).filter(Boolean)
+  )].sort();
+
+  regionTags.forEach(tag => regionFilter.appendChild(new Option(tag, tag)));
+}
+
+function filterResults() {
+  const search = document.getElementById("searchInput").value.toLowerCase();
+  const type = document.getElementById("typeFilter").value;
+  const region = document.getElementById("regionFilter").value;
+  const emailFilter = document.getElementById("emailFilter").value;
+  const linkedinFilter = document.getElementById("linkedinFilter").value;
+  const confidenceFilter = document.getElementById("confidenceFilter").value;
+  const sort = document.getElementById("sortFilter").value;
+
+  let filtered = allResults.filter(r => {
+    const s = JSON.stringify(r).toLowerCase();
+    const regionTag = r.hq_city ? `${r.region} (${r.hq_city})` : (r.region || "");
+    const matchesSearch = !search || s.includes(search);
+    const matchesType = !type || r.investor_type === type;
+    const matchesRegion = !region || regionTag === region;
+
+    let matchesEmail = true;
+    if (emailFilter === "has") matchesEmail = r.emails && r.emails.length > 0;
+    else if (emailFilter === "strong") matchesEmail = (r.email_details || []).some(e => e.score >= 5);
+    else if (emailFilter === "verified") matchesEmail = (r.email_details || []).some(e => e.source === "mailto");
+
+    let matchesLinkedIn = true;
+    if (linkedinFilter === "has") matchesLinkedIn = r.linkedin && r.linkedin.length > 0;
+    else if (linkedinFilter === "personal") matchesLinkedIn = (r.linkedin_details || []).some(l => l.score === 5);
+    else if (linkedinFilter === "strong") matchesLinkedIn = (r.linkedin_details || []).some(l => l.score >= 3);
+
+    let matchesConfidence = true;
+    if (confidenceFilter === "HIGH") matchesConfidence = r.confidence === "HIGH";
+    else if (confidenceFilter === "MEDIUM") matchesConfidence = r.confidence === "MEDIUM";
+
+    return matchesSearch && matchesType && matchesRegion && matchesEmail && matchesLinkedIn && matchesConfidence;
+  });
+
+  if (sort === "email") {
+    filtered.sort((a, b) => (b.email_score || 0) - (a.email_score || 0));
+  } else if (sort === "linkedin") {
+    filtered.sort((a, b) => (b.linkedin_score || 0) - (a.linkedin_score || 0));
+  } else if (sort === "combined") {
+    filtered.sort((a, b) => ((b.email_score || 0) + (b.linkedin_score || 0)) - ((a.email_score || 0) + (a.linkedin_score || 0)));
+  } else if (sort === "confidence") {
+    const rank = { HIGH: 2, MEDIUM: 1 };
+    filtered.sort((a, b) => (rank[b.confidence] || 0) - (rank[a.confidence] || 0));
+  } else {
+    filtered.sort((a, b) => (b.investor_score || 0) - (a.investor_score || 0));
+  }
+
+  renderResults(filtered);
+}
+
+function renderResults(results) {
+  const body = document.getElementById("resultsBody");
+
+  if (results.length === 0) {
+    body.innerHTML = '<tr><td colspan="14" class="empty">No matching records.</td></tr>';
+    return;
+  }
+
+  body.innerHTML = results.map(r => {
+    const emailDetails = r.email_details || [];
+    const emails = emailDetails.length
+      ? emailDetails.map(e => {
+          const badgeClass = e.score >= 6 ? "green" : (e.score >= 4 ? "yellow" : "gray");
+          return `<div><a href="mailto:${escapeHtml(e.email)}">${escapeHtml(e.email)}</a> <span class="badge ${badgeClass}">${e.score}/7</span></div>`;
+        }).join("")
+      : (r.emails || []).map(e => `<div><a href="mailto:${e}">${escapeHtml(e)}</a></div>`).join("") || "-";
+
+    const linkedinDetails = r.linkedin_details || [];
+    const linkedin = linkedinDetails.length
+      ? linkedinDetails.map(l => {
+          const badgeClass = l.score === 5 ? "blue" : (l.score >= 3 ? "green" : "gray");
+          const label = l.score === 5 ? "profile" : (l.score >= 3 ? "company" : "page");
+          return `<div><a href="${l.url}" target="_blank">${label}</a> <span class="badge ${badgeClass}">${l.score}/5</span></div>`;
+        }).join("")
+      : (r.linkedin || []).map(u => `<div><a href="${u}" target="_blank">Profile</a></div>`).join("") || "-";
+
+    const source = r.source_url
+      ? `<a href="${r.source_url}" target="_blank">Open</a>`
+      : "-";
+
+    const regionDisplay = r.hq_city
+      ? `${escapeHtml(r.region || "-")} (${escapeHtml(r.hq_city)})`
+      : escapeHtml(r.region || "-");
+
+    const confidence = r.confidence === "HIGH"
+      ? '<span class="badge green">HIGH</span>'
+      : '<span class="badge yellow">MEDIUM</span>';
+
+    const fresh = r.is_fresh
+      ? `<span class="badge green">${r.latest_year || "yes"}</span>`
+      : '<span class="badge gray">old</span>';
+
+    return `
+      <tr>
+        <td>${escapeHtml(r.name || "-")}</td>
+        <td>${escapeHtml(r.company_name || "-")}</td>
+        <td>${escapeHtml(r.investor_type || "-")}</td>
+        <td>${regionDisplay}</td>
+        <td>${escapeHtml((r.sectors || []).join(", ") || "-")}</td>
+        <td>${escapeHtml((r.tags || []).join(", ") || "-")}</td>
+        <td>${emails}</td>
+        <td>${linkedin}</td>
+        <td>${r.investor_score ?? "-"}</td>
+        <td>${r.email_score ?? 0}</td>
+        <td>${r.linkedin_score ?? 0}</td>
+        <td>${confidence}</td>
+        <td>${fresh}</td>
+        <td>${source}</td>
+      </tr>`;
+  }).join("");
+}
+
+function downloadCSV() {
+  if (allResults.length === 0) { alert("No results."); return; }
+  const headers = ["Name","Company","Investor Type","Region","City","Sectors","Tags","Emails","Email Score","LinkedIn","LinkedIn Score","Confidence","Fresh","Latest Year","Investor Score","Source"];
+  const rows = allResults.map(r => [
+    r.name || "", r.company_name || "", r.investor_type || "", r.region || "", r.hq_city || "",
+    (r.sectors || []).join("; "), (r.tags || []).join("; "),
+    (r.emails || []).join("; "), r.email_score ?? 0,
+    (r.linkedin || []).join("; "), r.linkedin_score ?? 0,
+    r.confidence || "", r.is_fresh ? "yes" : "no", r.latest_year || "",
+    r.investor_score ?? "", r.source_url || ""
+  ]);
+  saveCSV(headers, rows, "investor-results.csv");
+}
+
+function downloadEmailsCSV() {
+  const withEmails = allResults.filter(r => r.emails && r.emails.length > 0);
+  if (withEmails.length === 0) { alert("No emails found."); return; }
+  const headers = ["Company","Investor Type","Region","City","Email","Source","Score","Confidence","Source URL"];
+  const rows = [];
+  withEmails.forEach(r => {
+    (r.email_details || r.emails.map(e => ({ email: e, source: "body", score: 1 }))).forEach(e => {
+      rows.push([
+        r.company_name || "", r.investor_type || "", r.region || "", r.hq_city || "",
+        e.email, e.source, e.score, r.confidence || "", r.source_url || ""
+      ]);
+    });
+  });
+  saveCSV(headers, rows, "investor-emails.csv");
+}
+
+function downloadLinkedInCSV() {
+  const withLI = allResults.filter(r => r.linkedin && r.linkedin.length > 0);
+  if (withLI.length === 0) { alert("No LinkedIn found."); return; }
+  const headers = ["Company","Investor Type","Region","City","LinkedIn URL","Type","Score","Confidence","Source URL"];
+  const rows = [];
+  withLI.forEach(r => {
+    (r.linkedin_details || r.linkedin.map(u => ({ url: u, score: 1 }))).forEach(l => {
+      const type = l.score === 5 ? "profile" : (l.score >= 3 ? "company" : "page");
+      rows.push([
+        r.company_name || "", r.investor_type || "", r.region || "", r.hq_city || "",
+        l.url, type, l.score, r.confidence || "", r.source_url || ""
+      ]);
+    });
+  });
+  saveCSV(headers, rows, "investor-linkedin.csv");
+}
+
+function saveCSV(headers, rows, filename) {
+  const csv = [headers, ...rows]
+    .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function escapeHtml(v) {
+  return String(v)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+</script>
+
+</body>
+</html>

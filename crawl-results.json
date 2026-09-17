@@ -1,0 +1,1950 @@
+[
+  {
+    "name": "",
+    "company_name": "www.northdata.com",
+    "investor_type": "Private Equity",
+    "region": "Europe",
+    "sectors": [
+      "AI",
+      "Consumer",
+      "Mobility"
+    ],
+    "tags": [
+      "B2B",
+      "Global"
+    ],
+    "emails": [
+      "info@northdata.de"
+    ],
+    "email_details": [
+      {
+        "email": "info@northdata.de",
+        "source": "mailto",
+        "weight": 10,
+        "score": 4
+      }
+    ],
+    "email_score": 4,
+    "linkedin": [],
+    "linkedin_details": [],
+    "linkedin_score": 0,
+    "phones": [],
+    "latest_year": 2026,
+    "is_fresh": true,
+    "website": "https://northdata.com/_datashowcase",
+    "source_url": "https://northdata.com/_datashowcase",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 8,
+    "status_code": 200,
+    "hq_city": "Berlin",
+    "confidence": "HIGH",
+    "source_count": 9,
+    "all_sources": [
+      "https://northdata.com/_datashowcase",
+      "https://northdata.com/Rolls-Royce%20plc,%20London/Companies%20House%2001003142",
+      "https://northdata.com/Unilever%20Global%20IP%20Ltd%C2%B7,%20Wirral/Companies%20House%2012920301",
+      "https://northdata.com/Nicoventures%20Trading%20Ltd%C2%B7,%20London/Companies%20House%2006665343",
+      "https://northdata.com/Jaguar%20Land%20Rover%20Ltd%C2%B7,%20Coventry/Companies%20House%2001672070",
+      "https://northdata.com/_datashowcase?hsLang=en",
+      "https://northdata.com/Coopervision%20International%20Ltd%C2%B7,%20Fareham/Companies%20House%2012210296",
+      "https://northdata.com/Dyson%20Technology%20Ltd%C2%B7,%20Wiltshire/Companies%20House%2001959090",
+      "https://northdata.com/ARM%20Ltd%C2%B7,%20Cambridge/Companies%20House%2002557590"
+    ],
+    "cities": [
+      "Berlin",
+      "London",
+      "Paris",
+      "Amsterdam"
+    ]
+  },
+  {
+    "name": "",
+    "company_name": "VCDir",
+    "investor_type": "Venture Capital",
+    "region": "Europe",
+    "sectors": [
+      "SaaS",
+      "FinTech",
+      "Healthcare",
+      "EdTech",
+      "ClimateTech",
+      "Cybersecurity",
+      "ECommerce",
+      "Mobility",
+      "AI",
+      "Consumer",
+      "DeepTech",
+      "SpaceTech"
+    ],
+    "tags": [
+      "Pre-Seed",
+      "Series A",
+      "Series B",
+      "Global",
+      "Seed",
+      "Early Stage",
+      "B2B",
+      "B2C",
+      "Lead Investor",
+      "Follow On",
+      "Founder Friendly"
+    ],
+    "emails": [
+      "hello@vcdir.com"
+    ],
+    "email_details": [
+      {
+        "email": "hello@vcdir.com",
+        "source": "mailto",
+        "weight": 10,
+        "score": 4
+      }
+    ],
+    "email_score": 4,
+    "linkedin": [
+      "http://www.linkedin.com/company/10000startups",
+      "https://www.linkedin.com/company/100xentrepreneur",
+      "https://www.linkedin.com/company/-angels/"
+    ],
+    "linkedin_details": [
+      {
+        "url": "http://www.linkedin.com/company/10000startups",
+        "score": 3
+      },
+      {
+        "url": "https://www.linkedin.com/company/100xentrepreneur",
+        "score": 3
+      },
+      {
+        "url": "https://www.linkedin.com/company/-angels/",
+        "score": 3
+      }
+    ],
+    "linkedin_score": 3,
+    "phones": [
+      "4400107744",
+      "053575766895"
+    ],
+    "latest_year": 2026,
+    "is_fresh": true,
+    "website": "https://vcdir.com",
+    "source_url": "https://vcdir.com",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 35,
+    "status_code": 200,
+    "hq_city": null,
+    "confidence": "HIGH",
+    "source_count": 78,
+    "all_sources": [
+      "https://vcdir.com",
+      "https://vcdir.com/",
+      "https://vcdir.com/vc-firms",
+      "https://vcdir.com/angels",
+      "https://vcdir.com/pricing",
+      "https://vcdir.com/map",
+      "https://vcdir.com/about",
+      "https://vcdir.com/glossary",
+      "https://vcdir.com/valuation-calculator",
+      "https://vcdir.com/contact",
+      "https://vcdir.com/us",
+      "https://vcdir.com/uk",
+      "https://vcdir.com/ae",
+      "https://vcdir.com/fr",
+      "https://vcdir.com/ca",
+      "https://vcdir.com/au",
+      "https://vcdir.com/in",
+      "https://vcdir.com/jp",
+      "https://vcdir.com/contact-removal",
+      "https://vcdir.com/vc/10000-start-ups",
+      "https://vcdir.com/vc/100x-entrepreneur",
+      "https://vcdir.com/vc/angels",
+      "https://vcdir.com/vc/vest",
+      "https://vcdir.com/vc/era-entrepreneurs-roundtable-accelerator",
+      "https://vcdir.com/vc/cap",
+      "https://vcdir.com/vc/nd-capital",
+      "https://vcdir.com/vc/406-ventures",
+      "https://vcdir.com/vc/0-ventures",
+      "https://vcdir.com/vc/01ventures",
+      "https://vcdir.com/vc/01vc",
+      "https://vcdir.com/vc/0xcapital",
+      "https://vcdir.com/vc/10-capital",
+      "https://vcdir.com/vc/10-point-capital",
+      "https://vcdir.com/vc/100-open-angels",
+      "https://vcdir.com/angels/markets",
+      "https://vcdir.com/angels/81dfd54b-7460-430d-822a-920fa4563f33",
+      "https://vcdir.com/angels/f7c1fa4f-e952-45fe-8052-c997164f7c2d",
+      "https://vcdir.com/angels/20a8868d-f2c4-4690-b161-a260f18234f5",
+      "https://vcdir.com/angels/945fbba9-a0d2-475a-b44f-2036d20b93a5",
+      "https://vcdir.com/angels/3b147b1b-f8bb-43ad-9a81-76e943db181d",
+      "https://vcdir.com/angels/3b4b6950-004a-4153-bad4-99cee7c6f9fe",
+      "https://vcdir.com/angels/23bc8997-8d01-4683-8814-c1bf6ff5fef9",
+      "https://vcdir.com/angels/fd3624ce-d7ba-46ef-8ea0-1e456d2763ba",
+      "https://vcdir.com/angels/0123ce78-48f1-48be-9cad-6c82339f2591",
+      "https://vcdir.com/angels/cae57bf7-448d-4482-89e5-f202a07a481b",
+      "https://vcdir.com/angels/dc3d8656-ba2e-4b89-b86f-0f7775b8a903",
+      "https://vcdir.com/angels/cf134a58-5d46-4862-b9bc-805dce0a4ab7",
+      "https://vcdir.com/angels/18119b0e-10cd-4630-bbed-797260787bbf",
+      "https://vcdir.com/angels/21a7133e-dbfa-48ed-b5e1-3586b17f646c",
+      "https://vcdir.com/angels/c328995f-8412-4644-b254-7ade449b537f",
+      "https://vcdir.com/glossary/safe-note",
+      "https://vcdir.com/glossary/pre-seed",
+      "https://vcdir.com/glossary/convertible-note",
+      "https://vcdir.com/glossary/equity-round",
+      "https://vcdir.com/glossary/venture-debt",
+      "https://vcdir.com/glossary/term-sheet",
+      "https://vcdir.com/glossary/dilution",
+      "https://vcdir.com/glossary/pro-rata-rights",
+      "https://vcdir.com/glossary/liquidation-preference",
+      "https://vcdir.com/glossary/dry-powder",
+      "https://vcdir.com/glossary/fund-of-funds",
+      "https://vcdir.com/glossary/carry",
+      "https://vcdir.com/glossary/gp",
+      "https://vcdir.com/glossary/lp",
+      "https://vcdir.com/glossary/dpi",
+      "https://vcdir.com/glossary/irr",
+      "https://vcdir.com/glossary/tvpi",
+      "https://vcdir.com/stages",
+      "https://vcdir.com/markets",
+      "https://vcdir.com/countries",
+      "https://vcdir.com/vc/10x-capital",
+      "https://vcdir.com/vc/11-11-ventures",
+      "https://vcdir.com/vc/1414-ventures",
+      "https://vcdir.com/vc/1517-fund",
+      "https://vcdir.com/vc/1843-capital",
+      "https://vcdir.com/vc/1955-capital",
+      "https://vcdir.com/vc/1984-ventures",
+      "https://vcdir.com/vc/2-punks-capital"
+    ],
+    "cities": [
+      "San Francisco",
+      "London",
+      "Bangalore",
+      "Singapore"
+    ]
+  },
+  {
+    "name": "Investor Hunt",
+    "company_name": "Investor Hunt",
+    "investor_type": "Venture Capital",
+    "region": "USA",
+    "sectors": [
+      "Healthcare",
+      "ClimateTech",
+      "SaaS",
+      "ECommerce",
+      "Mobility",
+      "AI",
+      "FinTech",
+      "Cybersecurity",
+      "Consumer",
+      "DeepTech",
+      "SpaceTech",
+      "EdTech",
+      "AgriTech"
+    ],
+    "tags": [
+      "Pre-Seed",
+      "Seed",
+      "Early Stage",
+      "Series A",
+      "B2B",
+      "B2C",
+      "Global",
+      "Series B",
+      "Lead Investor",
+      "Follow On"
+    ],
+    "emails": [
+      "delorean@beyondnextventures.com",
+      "questions@lumolabs.io",
+      "jeffbarnes@angelnetwork.com"
+    ],
+    "email_details": [
+      {
+        "email": "delorean@beyondnextventures.com",
+        "source": "body",
+        "weight": 6,
+        "score": 6
+      },
+      {
+        "email": "questions@lumolabs.io",
+        "source": "body",
+        "weight": 6,
+        "score": 6
+      },
+      {
+        "email": "jeffbarnes@angelnetwork.com",
+        "source": "body",
+        "weight": 7,
+        "score": 6
+      }
+    ],
+    "email_score": 18,
+    "linkedin": [
+      "https://www.linkedin.com/pulse/how-keep-potential-investors-updated-template-ash-rust/"
+    ],
+    "linkedin_details": [
+      {
+        "url": "https://www.linkedin.com/pulse/how-keep-potential-investors-updated-template-ash-rust/",
+        "score": 1
+      }
+    ],
+    "linkedin_score": 1,
+    "phones": [],
+    "latest_year": 2026,
+    "is_fresh": true,
+    "website": "https://investorhunt.co",
+    "source_url": "https://investorhunt.co",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 29,
+    "status_code": 200,
+    "hq_city": "New York",
+    "confidence": "HIGH",
+    "source_count": 65,
+    "all_sources": [
+      "https://investorhunt.co",
+      "https://investorhunt.co/",
+      "https://investorhunt.co/pricing",
+      "https://investorhunt.co/templates",
+      "https://investorhunt.co/investor-update-templates",
+      "https://investorhunt.co/best-startup-books",
+      "https://investorhunt.co/accelerators",
+      "https://investorhunt.co/investor-pitch-prep",
+      "https://investorhunt.co/fundraising-glossary",
+      "https://investorhunt.co/investors",
+      "https://investorhunt.co/cities/new-york-city",
+      "https://investorhunt.co/cities/san-francisco",
+      "https://investorhunt.co/cities/los-angeles",
+      "https://investorhunt.co/cities/asia",
+      "https://investorhunt.co/markets/mobile",
+      "https://investorhunt.co/markets/consumer-internet",
+      "https://investorhunt.co/markets/enterprise-software",
+      "https://investorhunt.co/markets/healthcare",
+      "https://investorhunt.co/markets/clean-technology",
+      "https://investorhunt.co/blogs/top-10-vc-firms-in-wollongong",
+      "https://investorhunt.co/blogs/top-10-vc-firms-in-leicester",
+      "https://investorhunt.co/blogs/top-10-vc-firms-in-liverpool",
+      "https://investorhunt.co/blogs/top-10-vc-firms-in-manchester",
+      "https://investorhunt.co/blogs/top-10-vc-firms-in-southampton",
+      "https://investorhunt.co/blogs/top-10-vc-firms-in-canberra",
+      "https://investorhunt.co/blogs/top-10-vc-firms-in-coral-sea-islands-territory",
+      "https://investorhunt.co/blogs/top-10-vc-firms-in-new-south-wales",
+      "https://investorhunt.co/blogs/top-10-vc-firms-in-norfolk-island",
+      "https://investorhunt.co/blogs/top-10-vc-firms-in-queensland",
+      "https://investorhunt.co/blogs/top-10-vc-firms-in-darwin",
+      "https://investorhunt.co/blogs/top-10-vc-firms-in-cairns",
+      "https://investorhunt.co/investor-update-templates/digital-ocean",
+      "https://investorhunt.co/investor-update-templates/founder-institute",
+      "https://investorhunt.co/investor-update-templates/buffer",
+      "https://investorhunt.co/investor-update-templates/notion",
+      "https://investorhunt.co/investor-update-templates/visible",
+      "https://investorhunt.co/investor-update-templates/founder-collective",
+      "https://investorhunt.co/investor-update-templates/openview-partners",
+      "https://investorhunt.co/investor-update-templates/underscore-vc",
+      "https://investorhunt.co/investor-update-templates/base-templates",
+      "https://investorhunt.co/investor-update-templates/feel-the-boot",
+      "https://investorhunt.co/investor-update-templates/galileo-ventures",
+      "https://investorhunt.co/investor-update-templates/500-global",
+      "https://investorhunt.co/investor-update-templates/mindset-health",
+      "https://investorhunt.co/investor-update-templates/kima-ventures",
+      "https://investorhunt.co/investor-update-templates/y-combinator",
+      "https://investorhunt.co/investor-update-templates/almanac",
+      "https://investorhunt.co/investor-update-templates/zeni-ai",
+      "https://investorhunt.co/investor-update-templates/folk-app",
+      "https://investorhunt.co/investor-update-templates/taskade",
+      "https://investorhunt.co/investor-update-templates/ash-rust",
+      "https://investorhunt.co/investor-update-templates/finmark",
+      "https://investorhunt.co/investor-update-templates/nextview-vc",
+      "https://investorhunt.co/investor-update-templates/ben-yoskovitz",
+      "https://investorhunt.co/investor-update-templates/techstars",
+      "https://investorhunt.co/best-startup-books/angel-investing-the-gust-guide-to-making-money--having-fun-investing-in-startups",
+      "https://investorhunt.co/best-startup-books/the-art-of-the-start-20",
+      "https://investorhunt.co/best-startup-books/government-incentives-tax-credits-grants-cash-reimbursements--financing",
+      "https://investorhunt.co/best-startup-books/why-startups-fail-a-new-roadmap-for-entrepreneurial-success",
+      "https://investorhunt.co/best-startup-books/rework",
+      "https://investorhunt.co/best-startup-books/getting-to-yes-negotiating-agreement-without-giving-in",
+      "https://investorhunt.co/best-startup-books/hooked-how-to-build-habitforming-products",
+      "https://investorhunt.co/best-startup-books/good-to-great-why-some-companies-make-the-leap-and-others-dont",
+      "https://investorhunt.co/best-startup-books/lean-analytics-use-data-to-build-a-better-startup-faster",
+      "https://investorhunt.co/best-startup-books/high-output-management"
+    ],
+    "cities": [
+      "New York",
+      "San Francisco",
+      "London",
+      "Boston"
+    ]
+  },
+  {
+    "name": "",
+    "company_name": "Point Nine",
+    "investor_type": "Venture Capital",
+    "region": "Europe",
+    "sectors": [
+      "SaaS",
+      "FinTech",
+      "Healthcare",
+      "AI",
+      "Cybersecurity",
+      "DeepTech"
+    ],
+    "tags": [
+      "Pre-Seed",
+      "Seed",
+      "Early Stage",
+      "Series A",
+      "Global",
+      "Series B",
+      "B2B",
+      "B2C"
+    ],
+    "emails": [],
+    "email_details": [],
+    "email_score": 0,
+    "linkedin": [
+      "https://www.linkedin.com/company/point-nine-capital/",
+      "https://www.linkedin.com/pulse/what-made-contentful-win-christoph-janz-nnhsf/",
+      "https://www.linkedin.com/pulse/cursors-hypergrowth-300m-arr-christoph-janz-oos7f/"
+    ],
+    "linkedin_details": [
+      {
+        "url": "https://www.linkedin.com/company/point-nine-capital/",
+        "score": 3
+      },
+      {
+        "url": "https://www.linkedin.com/pulse/what-made-contentful-win-christoph-janz-nnhsf/",
+        "score": 1
+      },
+      {
+        "url": "https://www.linkedin.com/pulse/cursors-hypergrowth-300m-arr-christoph-janz-oos7f/",
+        "score": 1
+      }
+    ],
+    "linkedin_score": 5,
+    "phones": [],
+    "latest_year": 2025,
+    "is_fresh": true,
+    "website": "https://pointnine.com",
+    "source_url": "https://pointnine.com",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 9,
+    "status_code": 200,
+    "hq_city": "Berlin",
+    "confidence": "HIGH",
+    "source_count": 6,
+    "all_sources": [
+      "https://pointnine.com",
+      "https://pointnine.com/",
+      "https://pointnine.com/library",
+      "https://pointnine.com/library?f34b63bd_page=2",
+      "https://pointnine.com/library?f34b63bd_page=1",
+      "https://pointnine.com/library?f34b63bd_page=3"
+    ],
+    "cities": [
+      "Berlin",
+      "London",
+      "Paris"
+    ]
+  },
+  {
+    "name": "",
+    "company_name": "Cusp AI",
+    "investor_type": "Venture Capital",
+    "region": "USA",
+    "sectors": [
+      "AI",
+      "FinTech"
+    ],
+    "tags": [
+      "Global"
+    ],
+    "emails": [
+      "hello@northzone.com"
+    ],
+    "email_details": [
+      {
+        "email": "hello@northzone.com",
+        "source": "mailto",
+        "weight": 10,
+        "score": 4
+      }
+    ],
+    "email_score": 4,
+    "linkedin": [
+      "https://www.linkedin.com/company/northzone/"
+    ],
+    "linkedin_details": [
+      {
+        "url": "https://www.linkedin.com/company/northzone/",
+        "score": 3
+      }
+    ],
+    "linkedin_score": 3,
+    "phones": [],
+    "latest_year": 2026,
+    "is_fresh": true,
+    "website": "https://northzone.com/portfolio/cuspai",
+    "source_url": "https://northzone.com/portfolio/cuspai",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 5,
+    "status_code": 200,
+    "hq_city": "London",
+    "confidence": "HIGH",
+    "source_count": 5,
+    "all_sources": [
+      "https://northzone.com/portfolio/cuspai",
+      "https://northzone.com/portfolio/govdash",
+      "https://northzone.com/portfolio/yonder",
+      "https://northzone.com/portfolio/energy-micro",
+      "https://northzone.com/portfolio/episerver"
+    ],
+    "cities": [
+      "London",
+      "Berlin",
+      "Stockholm"
+    ]
+  },
+  {
+    "name": "",
+    "company_name": "Standing Committees",
+    "investor_type": "Private Equity",
+    "region": "Europe",
+    "sectors": [
+      "AI",
+      "FinTech",
+      "Cybersecurity"
+    ],
+    "tags": [
+      "Global",
+      "Early Stage",
+      "Lead Investor"
+    ],
+    "emails": [],
+    "email_details": [],
+    "email_score": 0,
+    "linkedin": [
+      "https://www.linkedin.com/company/european-securities-and-markets-authority-esma/"
+    ],
+    "linkedin_details": [
+      {
+        "url": "https://www.linkedin.com/company/european-securities-and-markets-authority-esma/",
+        "score": 3
+      }
+    ],
+    "linkedin_score": 3,
+    "phones": [],
+    "latest_year": 2026,
+    "is_fresh": true,
+    "website": "https://esma.europa.eu/about-esma/governance-structure/standing-committees",
+    "source_url": "https://esma.europa.eu/about-esma/governance-structure/standing-committees",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 12,
+    "status_code": 200,
+    "hq_city": "Paris",
+    "confidence": "HIGH",
+    "source_count": 17,
+    "all_sources": [
+      "https://esma.europa.eu/about-esma/governance-structure/standing-committees",
+      "https://esma.europa.eu/esmas-activities/investors-and-issuers/fund-management",
+      "https://esma.europa.eu/esmas-activities/investors-and-issuers/investment-services-and-crowdfunding",
+      "https://esma.europa.eu/esmas-activities/markets-and-infrastructure/data-reporting-services-providers",
+      "https://esma.europa.eu/esmas-activities/markets-and-infrastructure/trading",
+      "https://esma.europa.eu/esmas-activities/markets-and-infrastructure/central-securities-depositories",
+      "https://esma.europa.eu/esmas-activities/risk-analysis/risk-monitoring",
+      "https://esma.europa.eu/esmas-activities/risk-analysis/topical-analysis",
+      "https://esma.europa.eu/esmas-activities/sustainable-finance/investment-services-and-fund-management",
+      "https://esma.europa.eu/esmas-activities/digital-finance-and-innovation",
+      "https://esma.europa.eu/esmas-activities/digital-finance-and-innovation/dlt-pilot-regime",
+      "https://esma.europa.eu/esmas-activities/supervision",
+      "https://esma.europa.eu/publications-and-data/peer-reviews",
+      "https://esma.europa.eu/publications-and-data/databases-and-registers",
+      "https://esma.europa.eu/esmas-activities/listing-act",
+      "https://esma.europa.eu/publications-and-data",
+      "https://esma.europa.eu/databases-library/esma-library"
+    ],
+    "cities": [
+      "Paris",
+      "Berlin",
+      "London",
+      "Amsterdam",
+      "Madrid",
+      "Milan",
+      "Stockholm",
+      "Dublin"
+    ]
+  },
+  {
+    "name": "",
+    "company_name": "Invest Europe",
+    "investor_type": "Private Equity",
+    "region": "Europe",
+    "sectors": [
+      "AI",
+      "Healthcare",
+      "ECommerce",
+      "AgriTech",
+      "EdTech",
+      "DeepTech",
+      "Mobility",
+      "FinTech"
+    ],
+    "tags": [
+      "Global",
+      "Early Stage",
+      "Seed",
+      "B2B",
+      "Follow On",
+      "B2C"
+    ],
+    "emails": [],
+    "email_details": [],
+    "email_score": 0,
+    "linkedin": [
+      "https://www.linkedin.com/company/invest-europe/",
+      "https://www.linkedin.com/feed/update/urn:li:ugcPost:7467559882737655808/"
+    ],
+    "linkedin_details": [
+      {
+        "url": "https://www.linkedin.com/company/invest-europe/",
+        "score": 3
+      },
+      {
+        "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7467559882737655808/",
+        "score": 1
+      }
+    ],
+    "linkedin_score": 4,
+    "phones": [
+      "01481635896"
+    ],
+    "latest_year": 2026,
+    "is_fresh": true,
+    "website": "https://investeurope.eu",
+    "source_url": "https://investeurope.eu",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 17,
+    "status_code": 200,
+    "hq_city": "Brussels",
+    "confidence": "HIGH",
+    "source_count": 80,
+    "all_sources": [
+      "https://investeurope.eu",
+      "https://investeurope.eu/",
+      "https://investeurope.eu/about-private-equity/",
+      "https://investeurope.eu/about-private-equity/what-is-private-equity/",
+      "https://investeurope.eu/about-private-equity/private-equity-impact/",
+      "https://investeurope.eu/about-private-equity/private-equity-impact/a-different-angle/",
+      "https://investeurope.eu/about-private-equity/private-equity-impact/industry-leaders-views/",
+      "https://investeurope.eu/about-private-equity/responsible-investment/",
+      "https://investeurope.eu/about-private-equity/success-stories/",
+      "https://investeurope.eu/about-private-equity/find-an-investor/",
+      "https://investeurope.eu/about-private-equity/celebrating-european-venture-capital-2024/",
+      "https://investeurope.eu/about-us/",
+      "https://investeurope.eu/about-us/who-we-are/",
+      "https://investeurope.eu/about-us/who-we-are/meet-the-team/",
+      "https://investeurope.eu/about-us/who-we-are/our-history/",
+      "https://investeurope.eu/about-us/who-we-are/annual-highlights/",
+      "https://investeurope.eu/about-us/who-we-are/annual-reports/",
+      "https://investeurope.eu/about-us/who-we-are/our-climate-journey/",
+      "https://investeurope.eu/about-us/who-we-are/actively-supporting-ukraine/",
+      "https://investeurope.eu/about-us/who-we-are/data-collection/",
+      "https://investeurope.eu/about-us/who-we-are/research-methodology/",
+      "https://investeurope.eu/about-us/who-we-are/event-sponsorship-opportunities/",
+      "https://investeurope.eu/about-us/invest-europe-governance/",
+      "https://investeurope.eu/about-us/invest-europe-governance/invest-europe-chair-board/",
+      "https://investeurope.eu/about-us/invest-europe-governance/invest-europe-platforms/",
+      "https://investeurope.eu/about-us/invest-europe-governance/esg-committee/",
+      "https://investeurope.eu/about-us/invest-europe-governance/professional-standards-committee/",
+      "https://investeurope.eu/about-us/invest-europe-governance/public-affairs-committees-groups/",
+      "https://investeurope.eu/about-us/invest-europe-governance/communication-advisory-group-cag/",
+      "https://investeurope.eu/about-us/invest-europe-governance/evergreen-products-roundtable/",
+      "https://investeurope.eu/about-us/invest-europe-governance/infrastructure-roundtable/",
+      "https://investeurope.eu/about-us/invest-europe-governance/diversity-working-group/",
+      "https://investeurope.eu/about-us/invest-europe-governance/artificial-intelligence-taskforce/",
+      "https://investeurope.eu/about-us/invest-europe-governance/independent-sponsor-roundtable/",
+      "https://investeurope.eu/about-us/invest-europe-governance/the-european-life-sciences-coalition/",
+      "https://investeurope.eu/about-us/forward-2024-2029/",
+      "https://investeurope.eu/about-us/forward-2024-2029/unlocking-the-capital-to-fund-european-change/",
+      "https://investeurope.eu/about-us/forward-2024-2029/putting-our-continent-on-the-global-scale/",
+      "https://investeurope.eu/about-us/forward-2024-2029/boosting-innovators-and-creating-the-environment-for-them-to-thrive/",
+      "https://investeurope.eu/about-us/forward-2024-2029/investing-in-the-ecosystem-of-the-future/",
+      "https://investeurope.eu/contact/",
+      "https://investeurope.eu/contact/contact/",
+      "https://investeurope.eu/contact/event-sponsorship-enquiries/",
+      "https://investeurope.eu/news/",
+      "https://investeurope.eu/news/news/",
+      "https://investeurope.eu/news/video-hub/",
+      "https://investeurope.eu/news/communications-resources/",
+      "https://investeurope.eu/news/campaigns/",
+      "https://investeurope.eu/publications-policy/",
+      "https://investeurope.eu/publications-policy/publications/",
+      "https://investeurope.eu/publications-policy/industry-standards/",
+      "https://investeurope.eu/publications-policy/policy/",
+      "https://investeurope.eu/publications-policy/research/",
+      "https://investeurope.eu/events/",
+      "https://investeurope.eu/events/all-events/",
+      "https://investeurope.eu/events/about-our-events/",
+      "https://investeurope.eu/events/event-sponsorship-opportunities/",
+      "https://investeurope.eu/membership/",
+      "https://investeurope.eu/membership/become-a-member/",
+      "https://investeurope.eu/membership/member-search/",
+      "https://investeurope.eu/membership/am-i-a-member-already/",
+      "https://investeurope.eu/membership/lp-membership-benefits/",
+      "https://investeurope.eu/training/",
+      "https://investeurope.eu/training/training-courses/",
+      "https://investeurope.eu/training/about-our-training-offer/",
+      "https://investeurope.eu/publications-policy/publications/2026/positioned-for-the-challenge-capital-under-management-dry-powder-2025/",
+      "https://investeurope.eu/news/opinion/sfdr-20-european-parliament-moves-closer-to-a-more-workable-framework-for-private-markets/",
+      "https://investeurope.eu/publications-policy/publications/2026/capital-the-environment-and-power-in-the-21st-century-europe-in-pole-position/",
+      "https://investeurope.eu/news/newsroom/invest-europe-launches-first-bi-annual-policy-update/",
+      "https://investeurope.eu/publications-policy/publications/2026/public-affairs-update-h1-2026/",
+      "https://investeurope.eu/publications-policy/publications/2026/position-on-the-undertaking-in-difficulty-uid-definition/",
+      "https://investeurope.eu/news/video-hub/2026/you-ask-we-answer-18-how-are-pe-vc-powering-european-innovation/",
+      "https://investeurope.eu/news/newsroom/european-capital-under-management-reaches-record-137tn-in-2025-portfolio-at-cost-and-dry-powder-hit-new-highs/",
+      "https://investeurope.eu/news/video-hub/2026/capital-under-management-dry-powder-2025-summary-video/",
+      "https://investeurope.eu/news/newsroom/25-years-of-helping-europe-measure-innovation-invest-europe-remains-a-key-data-provider-to-the-european-innovation-scoreboard/",
+      "https://investeurope.eu/news/newsroom/supporting-global-lps-invest-europe-s-new-membership-resources/",
+      "https://investeurope.eu/news/opinion/european-renewable-energy-shifts-from-climate-imperative-to-strategic-necessity/",
+      "https://investeurope.eu/news/video-hub/2026/invest-europe-transaction-value-private-capital-analysis-2016-2025-summary-video/",
+      "https://investeurope.eu/publications-policy/publications/2026/transaction-value-analysis-2016-2025/",
+      "https://investeurope.eu/events/all-events/2026/chairs-dinner-milan-2026/"
+    ],
+    "cities": [
+      "Brussels",
+      "Berlin",
+      "Paris",
+      "London"
+    ]
+  },
+  {
+    "name": "",
+    "company_name": "AngelList",
+    "investor_type": "Venture Capital",
+    "region": "USA",
+    "sectors": [
+      "FinTech",
+      "ClimateTech",
+      "Healthcare",
+      "AI",
+      "SaaS"
+    ],
+    "tags": [
+      "B2B",
+      "Early Stage",
+      "Pre-Seed",
+      "Series A",
+      "B2C",
+      "Follow On",
+      "Global",
+      "Lead Investor",
+      "Seed",
+      "Series B"
+    ],
+    "emails": [
+      "team@nova.net",
+      "portal@angellist.com",
+      "lead@angellist.com"
+    ],
+    "email_details": [
+      {
+        "email": "team@nova.net",
+        "source": "mailto",
+        "weight": 10,
+        "score": 4
+      },
+      {
+        "email": "portal@angellist.com",
+        "source": "mailto",
+        "weight": 10,
+        "score": 7
+      },
+      {
+        "email": "lead@angellist.com",
+        "source": "mailto",
+        "weight": 10,
+        "score": 7
+      }
+    ],
+    "email_score": 7,
+    "linkedin": [
+      "https://www.linkedin.com/company/angellist",
+      "https://www.linkedin.com/in/paulsirving/",
+      "https://www.linkedin.com/in/ssbarker/"
+    ],
+    "linkedin_details": [
+      {
+        "url": "https://www.linkedin.com/company/angellist",
+        "score": 3
+      },
+      {
+        "url": "https://www.linkedin.com/in/paulsirving/",
+        "score": 5
+      },
+      {
+        "url": "https://www.linkedin.com/in/ssbarker/",
+        "score": 5
+      }
+    ],
+    "linkedin_score": 13,
+    "phones": [
+      "3967368785",
+      "819426354969"
+    ],
+    "latest_year": 2026,
+    "is_fresh": true,
+    "website": "https://angellist.com",
+    "source_url": "https://angellist.com",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 20,
+    "status_code": 200,
+    "hq_city": "San Francisco",
+    "confidence": "HIGH",
+    "source_count": 158,
+    "all_sources": [
+      "https://angellist.com",
+      "https://angellist.com/",
+      "https://angellist.com/contact",
+      "https://angellist.com/fund-administration",
+      "https://angellist.com/fund-administration/venture-funds",
+      "https://angellist.com/fund-administration/rolling-funds",
+      "https://angellist.com/fund-administration/scout-funds",
+      "https://angellist.com/fund-administration/spvs",
+      "https://angellist.com/investor-management",
+      "https://angellist.com/investor-management/digital-subscriptions",
+      "https://angellist.com/investor-management/data-room",
+      "https://angellist.com/link",
+      "https://angellist.com/pricing/venture-funds",
+      "https://angellist.com/funds-performance-calculator",
+      "https://angellist.com/startups/ruv/calculator",
+      "https://angellist.com/about",
+      "https://angellist.com/blog",
+      "https://angellist.com/learn",
+      "https://angellist.com/data-center",
+      "https://angellist.com/disclosures",
+      "https://angellist.com/blog/breaking-the-mold",
+      "https://angellist.com/venture-funds",
+      "https://angellist.com/rolling-funds",
+      "https://angellist.com/scout-funds",
+      "https://angellist.com/syndicates",
+      "https://angellist.com/blog/case-study-browder-capital",
+      "https://angellist.com/blog/full-service-fund-management",
+      "https://angellist.com/solutions/institutional-investors",
+      "https://angellist.com/blog/from-bain-capital-ventures-to-solo-gp-how-sarah-smith-raised-fund-i-on-angellist",
+      "https://angellist.com/pricing/spvs",
+      "https://angellist.com/pricing?tab=syndicates",
+      "https://angellist.com/digital-subscriptions",
+      "https://angellist.com/data-room",
+      "https://angellist.com/blog/how-vaneck-elevates-lp-onboarding-with-angellist-investor-management-suite",
+      "https://angellist.com/blog/getting-investor-onboarding-right",
+      "https://angellist.com/fund-migrations",
+      "https://angellist.com/blog/fund-benchmarks-a-mid-year-2026-refresh",
+      "https://angellist.com/blog/category/data",
+      "https://angellist.com/blog/the-semantic-layer-nobody-maintains",
+      "https://angellist.com/blog/category/engineering",
+      "https://angellist.com/blog/what-leading-gps-are-using-angellist-link-for-so-far",
+      "https://angellist.com/blog/category/product-news",
+      "https://angellist.com/blog/introducing-angellist-link",
+      "https://angellist.com/blog/vc-fund-performance-calculator",
+      "https://angellist.com/funds",
+      "https://angellist.com/blog/category/best-practices",
+      "https://angellist.com/blog/category/announcements",
+      "https://angellist.com/blog/category/founders",
+      "https://angellist.com/blog/category/case-studies",
+      "https://angellist.com/blog/category/all-articles",
+      "https://angellist.com/blog/author/abe-othman",
+      "https://angellist.com/blog/the-k-1-factory",
+      "https://angellist.com/blog/raising-institutional-capital",
+      "https://angellist.com/learn/category/running-a-fund",
+      "https://angellist.com/learn/category/investing-in-vc",
+      "https://angellist.com/learn/category/economics-and-reporting",
+      "https://angellist.com/learn/category/taxes",
+      "https://angellist.com/learn/category/vc-for-founders-and-startups",
+      "https://angellist.com/learn/category/vc-glossary",
+      "https://angellist.com/blog/fipvcc-what-fund-managers-need-to-know",
+      "https://angellist.com/blog/angellist-acquires-ark",
+      "https://angellist.com/blog/designing-accounting-transactions-as-first-class-domain-events",
+      "https://angellist.com/blog/teaching-a-spreadsheet-engine-to-teach-itself",
+      "https://angellist.com/blog/everyone-is-a-data-analyst-now",
+      "https://angellist.com/learn/tvpi",
+      "https://angellist.com/learn/liquidity-event",
+      "https://angellist.com/learn/accredited-investors-vs-qualified-purchasers",
+      "https://angellist.com/learn/cap-table",
+      "https://angellist.com/learn/category/all",
+      "https://angellist.com/data-center/fund-benchmarks-report-2025",
+      "https://angellist.com/data-center/2026-guide-to-fund-migrations",
+      "https://angellist.com/data-center/the-state-of-venture-1h25",
+      "https://angellist.com/data-center/raising-institutional-capital",
+      "https://angellist.com/data-center/the-state-of-venture-2024",
+      "https://angellist.com/data-center/how-to-plan-fund-one",
+      "https://angellist.com/data-center/the-state-of-us-early-stage-venture-and-startups-3q23",
+      "https://angellist.com/data-center/the-state-of-us-early-stage-venture-and-startups-2q23",
+      "https://angellist.com/data-center/the-state-of-us-early-stage-venture-1q23",
+      "https://angellist.com/data-center/the-state-of-u-s-early-stage-venture-startups-2022",
+      "https://angellist.com/pricing/spvs/calculator"
+    ],
+    "cities": [
+      "San Francisco",
+      "New York",
+      "London",
+      "Bangalore"
+    ]
+  },
+  {
+    "name": "",
+    "company_name": "Techstars",
+    "investor_type": "Venture Capital",
+    "region": "USA",
+    "sectors": [
+      "FinTech",
+      "Healthcare",
+      "Mobility",
+      "SaaS",
+      "ECommerce",
+      "AI",
+      "ClimateTech",
+      "SpaceTech",
+      "EdTech",
+      "DeepTech",
+      "Cybersecurity"
+    ],
+    "tags": [
+      "Early Stage",
+      "B2B",
+      "Global",
+      "Pre-Seed",
+      "Founder Friendly",
+      "Seed",
+      "Follow On",
+      "B2C"
+    ],
+    "emails": [],
+    "email_details": [],
+    "email_score": 0,
+    "linkedin": [
+      "https://www.linkedin.com/company/techstars/",
+      "https://linkedin.com/company/alloy-apis",
+      "https://linkedin.com/company/chainalysis"
+    ],
+    "linkedin_details": [
+      {
+        "url": "https://www.linkedin.com/company/techstars/",
+        "score": 3
+      },
+      {
+        "url": "https://linkedin.com/company/alloy-apis",
+        "score": 3
+      },
+      {
+        "url": "https://linkedin.com/company/chainalysis",
+        "score": 3
+      }
+    ],
+    "linkedin_score": 9,
+    "phones": [
+      "1363752357",
+      "1783623600"
+    ],
+    "latest_year": 2026,
+    "is_fresh": true,
+    "website": "https://techstars.com",
+    "source_url": "https://techstars.com",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 11,
+    "status_code": 200,
+    "hq_city": "Denver",
+    "confidence": "HIGH",
+    "source_count": 24,
+    "all_sources": [
+      "https://techstars.com",
+      "https://techstars.com/",
+      "https://techstars.com/portfolio",
+      "https://techstars.com/locations",
+      "https://techstars.com/newsroom/investment-terms",
+      "https://techstars.com/about",
+      "https://techstars.com/accelerators/abn-amro-techstars-future-of-finance-accelerator",
+      "https://techstars.com/accelerators/baltimore-ai-health",
+      "https://techstars.com/accelerators/chicago",
+      "https://techstars.com/accelerators/nyc",
+      "https://techstars.com/newsroom/techstars-and-justworks-announce-partnership-to-help-founders-focus-on-growing-their-businesses",
+      "https://techstars.com/blog/founder-advice/the-bootstrapping-mandate-it-s-not-a-question-of-if-but-how-long",
+      "https://techstars.com/for/founders",
+      "https://techstars.com/for/investors",
+      "https://techstars.com/contact",
+      "https://techstars.com/portfolio?program=ABN%20AMRO%20%26%20Techstars%20Future%20of%20Finance%20Accelerator",
+      "https://techstars.com/portfolio?program=Northwestern%20Medicine%20%26%20Techstars%20Healthcare%20Accelerator",
+      "https://techstars.com/blog/startup-spotlight/automating-the-infrastructure-of-care-with-athena-doshi-ceo-exactrx",
+      "https://techstars.com/portfolio?program=Techstars%20AI%20Health%20Baltimore",
+      "https://techstars.com/portfolio?program=Techstars%20Alabama%20EnergyTech%20Accelerator",
+      "https://techstars.com/blog/startup-spotlight/bringing-weather-intelligence-to-the-grid-a-with-ian-gibson-pitch-aeronautics",
+      "https://techstars.com/blog/startup-spotlight/revolutionizing-industrial-automation-with-phillip-hansel-of-ai-ops",
+      "https://techstars.com/portfolio?program=Techstars%20Anywhere%20Accelerator",
+      "https://techstars.com/portfolio?program=Techstars%20Boston%20Accelerator"
+    ],
+    "cities": [
+      "Denver",
+      "New York",
+      "London",
+      "Bangalore",
+      "Berlin"
+    ]
+  },
+  {
+    "name": "",
+    "company_name": "500 Global",
+    "investor_type": "Venture Capital",
+    "region": "USA",
+    "sectors": [
+      "FinTech",
+      "Healthcare",
+      "SaaS",
+      "DeepTech",
+      "EdTech",
+      "ClimateTech",
+      "Cybersecurity",
+      "Mobility",
+      "AI",
+      "ECommerce",
+      "Consumer",
+      "AgriTech"
+    ],
+    "tags": [
+      "Early Stage",
+      "B2B",
+      "B2C",
+      "Global",
+      "Pre-Seed",
+      "Seed",
+      "Founder Friendly",
+      "Series A",
+      "Series B",
+      "Follow On",
+      "Lead Investor"
+    ],
+    "emails": [
+      "partnerships@500.co",
+      "vcunlocked@500.co",
+      "damaris@500.co"
+    ],
+    "email_details": [
+      {
+        "email": "partnerships@500.co",
+        "source": "mailto",
+        "weight": 10,
+        "score": 7
+      },
+      {
+        "email": "vcunlocked@500.co",
+        "source": "body",
+        "weight": 6,
+        "score": 6
+      },
+      {
+        "email": "damaris@500.co",
+        "source": "mailto",
+        "weight": 10,
+        "score": 7
+      }
+    ],
+    "email_score": 7,
+    "linkedin": [
+      "https://linkedin.com/company/500global",
+      "https://www.linkedin.com/pulse/500-global-stanford-djassi-ventures-journey-behind-vc-cabral-yq1se/",
+      "https://www.linkedin.com/pulse/loneliest-job-venture-why-im-taking-stanford-hassen-arfaoui-my9cf/"
+    ],
+    "linkedin_details": [
+      {
+        "url": "https://linkedin.com/company/500global",
+        "score": 3
+      },
+      {
+        "url": "https://www.linkedin.com/pulse/500-global-stanford-djassi-ventures-journey-behind-vc-cabral-yq1se/",
+        "score": 1
+      },
+      {
+        "url": "https://www.linkedin.com/pulse/loneliest-job-venture-why-im-taking-stanford-hassen-arfaoui-my9cf/",
+        "score": 1
+      }
+    ],
+    "linkedin_score": 15,
+    "phones": [
+      "1729735922121",
+      "1720218025593"
+    ],
+    "latest_year": 2026,
+    "is_fresh": true,
+    "website": "https://500.co",
+    "source_url": "https://500.co",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 34,
+    "status_code": 200,
+    "hq_city": "San Francisco",
+    "confidence": "HIGH",
+    "source_count": 76,
+    "all_sources": [
+      "https://500.co",
+      "https://500.co/portfolio",
+      "https://500.co/strategy/flagship",
+      "https://500.co/founders/flagship",
+      "https://500.co/venture-education/vcu/stanford",
+      "https://500.co/strategy/sustainable-growth",
+      "https://500.co/founders/alberta/accelerator",
+      "https://500.co/contact",
+      "https://500.co/content",
+      "https://500.co/newsletter-sign-up",
+      "https://500.co/partnerships",
+      "https://500.co/funds",
+      "https://500.co/directory",
+      "https://500.co/",
+      "https://500.co/content/why-canva-is-pure-magic",
+      "https://500.co/content/sakana-ai-investing-in-global-pioneers-in-ai",
+      "https://500.co/content/how-innovaccer-is-embracing-ai-to-save-healthcare-workers-their-most-precious-commodity",
+      "https://500.co/content/how-store-hub-is-helping-small-retailers-in-southeast-asia-digitize-their-operations",
+      "https://500.co/mena",
+      "https://500.co/africa",
+      "https://500.co/sea",
+      "https://500.co/latam",
+      "https://500.co/content/gavi-partnership",
+      "https://500.co/content/alaa-murabit-sustainable-growth-strategy",
+      "https://500.co/content/digital-morocco-2030",
+      "https://500.co/connect/strategic-partnerships",
+      "https://500.co/founders/interest-form",
+      "https://500.co/get-in-touch/discover-venture-education",
+      "https://500.co/focus/ai",
+      "https://500.co/focus/sustainable-innovation",
+      "https://500.co/content/deepinfra",
+      "https://500.co/content/milken-power-of-ideas",
+      "https://500.co/content/morocco-the-bridge-economy-thesis",
+      "https://500.co/content/understand-the-current-before-you-paddle-out",
+      "https://500.co/content/the-5-biggest-debates-at-vc-unlocked-ai-edition",
+      "https://500.co/content/irissun-partner",
+      "https://500.co/content/sungwoo-ahn",
+      "https://500.co/content/portfolio-construction-in-the-age-of-ai",
+      "https://500.co/content/3-things-that-genuinely-surprised-us-from-vc-unlocked-ai-edition",
+      "https://500.co/content/the-vc-playbook-needs-to-be-rebuilt-not-refreshed",
+      "https://500.co/japan",
+      "https://500.co/eurasia",
+      "https://500.co/founders/",
+      "https://500.co/venture-education",
+      "https://500.co/content?categories=Stories",
+      "https://500.co/theglobalvc/women-investing-in-the-world-s-potential-returning-more-innovation-and-better-outcomes",
+      "https://500.co/content/14-years-of-500-global-flagship-accelerator",
+      "https://500.co/content/building-an-ecosystem-through-community",
+      "https://500.co/content/empowering-women-in-venture-capital-insights-from-vc-unlocked-alumnae",
+      "https://500.co/content?categories=Outlook",
+      "https://500.co/accelerators/accelerate-aichi",
+      "https://500.co/content/quarterly-letter-q2-25-venture-review-and-outlook",
+      "https://500.co/content/africa-building-scalable-sustainable-startups",
+      "https://500.co/content?categories=Spotlights",
+      "https://500.co/content/vcu-alumni-spotlight-emmanuel-adegboye",
+      "https://500.co/content/why-we-invested-in-play-ai",
+      "https://500.co/content/it-s-my-life-s-calling-how-vc-unlocked-inspired-the-launch-of-a-women-s-healthcare-fund",
+      "https://500.co/podcast",
+      "https://500.co/content/Atul-Mehta-Board-of-Directors",
+      "https://500.co/content/top-stories-in-august-on-us-26-m-raised-to-boost-worker-well-being-scale-water-tech-expand-sustainable-flavors-and-more",
+      "https://500.co/content/carsome-marks-its-most-profitable-quarter-with-us-5-m-ebitda-in-q2-25-scaling-further-with-ai-driven-services-markup-1193",
+      "https://500.co/content/breaking-barriers-in-female-wellness-saib",
+      "https://500.co/content/founder-s-frontline-how-ukrainian-startup-effa-is-keeping-their-dream-alive",
+      "https://500.co/portfolio?page=1&industry=all&region=Middle%20East%20%26%20Africa&stage=all&country=all&bModel=all&batch=all&sort=alphabetically",
+      "https://500.co/accelerators/sanabil-mena-seed-accelerator",
+      "https://500.co/venture-education/regional-programs/sanabil",
+      "https://500.co/founders/mena/seed-accelerator",
+      "https://500.co/founders/mena/startup-bootcamp",
+      "https://500.co/venture-education/vcu/mena",
+      "https://500.co/venture-education/aiu/mena",
+      "https://500.co/content/three-years-ITIDA",
+      "https://500.co/portfolio?page=1&industry=all&region=Africa&stage=all&country=all&bModel=all&batch=all&sort=alphabetically",
+      "https://500.co/founders/sustainable-innovation",
+      "https://500.co/founders/africa/seed-accelerator-nairobi",
+      "https://500.co/founders/africa/startup-bootcamp",
+      "https://500.co/portfolio?page=1&industry=all&region=Southeast%20Asia&stage=all&country=all&bModel=all&batch=all&sort=alphabetically"
+    ],
+    "cities": [
+      "San Francisco",
+      "Bangalore",
+      "Jakarta",
+      "Mexico City"
+    ]
+  },
+  {
+    "name": "",
+    "company_name": "Antler",
+    "investor_type": "Family Fund",
+    "region": "Southeast_Asia",
+    "sectors": [
+      "FinTech",
+      "Healthcare",
+      "ECommerce",
+      "SaaS",
+      "Mobility",
+      "EdTech",
+      "DeepTech",
+      "AI",
+      "ClimateTech",
+      "AgriTech",
+      "Cybersecurity",
+      "SpaceTech"
+    ],
+    "tags": [
+      "Pre-Seed",
+      "Early Stage",
+      "Series A",
+      "Series B",
+      "Global",
+      "Seed",
+      "B2B",
+      "B2C",
+      "Follow On",
+      "Lead Investor"
+    ],
+    "emails": [
+      "rike@antler.co",
+      "elevate@antler.co",
+      "rike.dopp@antler.co"
+    ],
+    "email_details": [
+      {
+        "email": "rike@antler.co",
+        "source": "mailto",
+        "weight": 10,
+        "score": 7
+      },
+      {
+        "email": "elevate@antler.co",
+        "source": "mailto",
+        "weight": 10,
+        "score": 7
+      },
+      {
+        "email": "rike.dopp@antler.co",
+        "source": "mailto",
+        "weight": 10,
+        "score": 7
+      }
+    ],
+    "email_score": 7,
+    "linkedin": [
+      "https://www.linkedin.com/company/antlerglobal/",
+      "https://www.linkedin.com/in/andrea-hajdu-howe-fca-5a2b4115/",
+      "https://www.linkedin.com/in/anthony-millet-9327713/"
+    ],
+    "linkedin_details": [
+      {
+        "url": "https://www.linkedin.com/company/antlerglobal/",
+        "score": 3
+      },
+      {
+        "url": "https://www.linkedin.com/in/andrea-hajdu-howe-fca-5a2b4115/",
+        "score": 5
+      },
+      {
+        "url": "https://www.linkedin.com/in/anthony-millet-9327713/",
+        "score": 5
+      }
+    ],
+    "linkedin_score": 15,
+    "phones": [],
+    "latest_year": 2026,
+    "is_fresh": true,
+    "website": "https://antler.co",
+    "source_url": "https://antler.co",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 33,
+    "status_code": 200,
+    "hq_city": "Singapore",
+    "confidence": "HIGH",
+    "source_count": 36,
+    "all_sources": [
+      "https://antler.co",
+      "https://antler.co/",
+      "https://antler.co/insights",
+      "https://antler.co/investors",
+      "https://antler.co/about",
+      "https://antler.co/ai",
+      "https://antler.co/portfolio/founder-stories/airalo",
+      "https://antler.co/portfolio/founder-stories/harper",
+      "https://antler.co/portfolio/founder-stories/hifi",
+      "https://antler.co/portfolio/founder-stories/tactiq",
+      "https://antler.co/portfolio/founder-stories/satlyt",
+      "https://antler.co/portfolio/founder-stories/fileai",
+      "https://antler.co/portfolio/founder-stories/sweatpals",
+      "https://antler.co/sustainability",
+      "https://antler.co/elevate",
+      "https://antler.co/newsroom",
+      "https://antler.co/blog/www-antler-co-blog-physical-ai-and-the-robotics-inflection-point",
+      "https://antler.co/blog/building-the-future-ai-innovation-and-quantum-computing-in-europe-the-further-faster-podcast",
+      "https://antler.co/blog/before-the-big-idea-there-was-the-founder",
+      "https://antler.co/blog/software-was-never-about-the-code",
+      "https://antler.co/blog/pre-seed-funding-in-australia-dries-up-at-the-end-of-the-year-heres-how-to-plan-for-it",
+      "https://antler.co/blog/european-founder-report-2026-a-tale-of-two-tiers",
+      "https://antler.co/blog/aina",
+      "https://antler.co/blog/crayonlabs",
+      "https://antler.co/insights?ee871885_page=2",
+      "https://antler.co/spokesperson/andrea-hajdu-howe",
+      "https://antler.co/spokesperson/anthony-millet",
+      "https://antler.co/spokesperson/charles-hayley-bell",
+      "https://antler.co/spokesperson/desmond-poon",
+      "https://antler.co/spokesperson/ros-bazany",
+      "https://antler.co/spokesperson/yashveer-yadav",
+      "https://antler.co/spokesperson/amy-zaghloul",
+      "https://antler.co/blog/europes-execution-era-an-antler-study",
+      "https://antler.co/blog/how-sustainability-succeeds-in-venture-capital",
+      "https://antler.co/blog/magnus-grimeland-on-capital-allocators-podcast",
+      "https://antler.co/blog/antler-partner-predictions-2024"
+    ],
+    "cities": [
+      "Singapore",
+      "Bangalore",
+      "London",
+      "Berlin",
+      "Tokyo"
+    ]
+  },
+  {
+    "name": "",
+    "company_name": "GitDealFlow",
+    "investor_type": "Angel Investor",
+    "region": "USA",
+    "sectors": [
+      "SaaS",
+      "FinTech",
+      "Healthcare",
+      "Cybersecurity",
+      "ECommerce",
+      "EdTech"
+    ],
+    "tags": [
+      "Pre-Seed",
+      "Series A",
+      "Series B",
+      "Global",
+      "Early Stage",
+      "Follow On",
+      "Seed",
+      "B2B",
+      "Lead Investor"
+    ],
+    "emails": [
+      "signals@gitdealflow.com"
+    ],
+    "email_details": [
+      {
+        "email": "signals@gitdealflow.com",
+        "source": "body",
+        "weight": 6,
+        "score": 6
+      }
+    ],
+    "email_score": 7,
+    "linkedin": [
+      "https://www.linkedin.com/company/gitdealflow"
+    ],
+    "linkedin_details": [
+      {
+        "url": "https://www.linkedin.com/company/gitdealflow",
+        "score": 3
+      }
+    ],
+    "linkedin_score": 3,
+    "phones": [],
+    "latest_year": 2026,
+    "is_fresh": true,
+    "website": "https://gitdealflow.com",
+    "source_url": "https://gitdealflow.com",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 14,
+    "status_code": 200,
+    "hq_city": null,
+    "confidence": "HIGH",
+    "source_count": 24,
+    "all_sources": [
+      "https://gitdealflow.com",
+      "https://gitdealflow.com/",
+      "https://gitdealflow.com/pricing",
+      "https://gitdealflow.com/vs/",
+      "https://gitdealflow.com/learn/",
+      "https://gitdealflow.com/how-to/",
+      "https://gitdealflow.com/start-here",
+      "https://gitdealflow.com/fund-scout",
+      "https://gitdealflow.com/status",
+      "https://gitdealflow.com/answers/",
+      "https://gitdealflow.com/use-cases/",
+      "https://gitdealflow.com/research/",
+      "https://gitdealflow.com/apply",
+      "https://gitdealflow.com/vs/crunchbase",
+      "https://gitdealflow.com/vs/pitchbook",
+      "https://gitdealflow.com/vs/dealroom",
+      "https://gitdealflow.com/vs/tracxn",
+      "https://gitdealflow.com/vs/angellist",
+      "https://gitdealflow.com/vs/privateequitywire",
+      "https://gitdealflow.com/learn",
+      "https://gitdealflow.com/how-to",
+      "https://gitdealflow.com/answers",
+      "https://gitdealflow.com/vs/crunchbase-vs-fundable",
+      "https://gitdealflow.com/vs/dealcloud-vs-affinity"
+    ],
+    "cities": [
+      "San Francisco",
+      "London",
+      "Bangalore"
+    ]
+  },
+  {
+    "name": "",
+    "company_name": "National Venture Capital Association - NVCA -",
+    "investor_type": "Venture Capital",
+    "region": "Europe",
+    "sectors": [
+      "AI",
+      "Healthcare",
+      "FinTech",
+      "Cybersecurity",
+      "SpaceTech",
+      "ClimateTech",
+      "Mobility",
+      "EdTech",
+      "DeepTech",
+      "SaaS"
+    ],
+    "tags": [
+      "Global",
+      "Follow On",
+      "Series A",
+      "Series B",
+      "Early Stage",
+      "Pre-Seed",
+      "Seed",
+      "Lead Investor"
+    ],
+    "emails": [
+      "jvita@nvca.org",
+      "membership@nvca.org",
+      "jzemel@nvca.org"
+    ],
+    "email_details": [
+      {
+        "email": "jvita@nvca.org",
+        "source": "mailto",
+        "weight": 10,
+        "score": 7
+      },
+      {
+        "email": "membership@nvca.org",
+        "source": "mailto",
+        "weight": 10,
+        "score": 7
+      },
+      {
+        "email": "jzemel@nvca.org",
+        "source": "mailto",
+        "weight": 10,
+        "score": 7
+      }
+    ],
+    "email_score": 20,
+    "linkedin": [
+      "https://www.linkedin.com/company/venture-forward-org/",
+      "https://www.linkedin.com/in/samaramejia/",
+      "https://www.linkedin.com/in/derrenburrell/"
+    ],
+    "linkedin_details": [
+      {
+        "url": "https://www.linkedin.com/company/venture-forward-org/",
+        "score": 3
+      },
+      {
+        "url": "https://www.linkedin.com/in/samaramejia/",
+        "score": 5
+      },
+      {
+        "url": "https://www.linkedin.com/in/derrenburrell/",
+        "score": 5
+      }
+    ],
+    "linkedin_score": 5,
+    "phones": [
+      "1667824746287",
+      "2028645920"
+    ],
+    "latest_year": 2026,
+    "is_fresh": true,
+    "website": "https://nvca.org",
+    "source_url": "https://nvca.org",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 17,
+    "status_code": 200,
+    "hq_city": "Washington DC",
+    "confidence": "HIGH",
+    "source_count": 34,
+    "all_sources": [
+      "https://nvca.org",
+      "https://nvca.org/about-us/",
+      "https://nvca.org/about-us/what-is-vc/",
+      "https://nvca.org/nvca-members/",
+      "https://nvca.org/nvca-industry-partners/",
+      "https://nvca.org/join-nvca/",
+      "https://nvca.org/public-policy/",
+      "https://nvca.org/taxes/",
+      "https://nvca.org/immigration/",
+      "https://nvca.org/foreign-investment/",
+      "https://nvca.org/capital-markets-regulation/",
+      "https://nvca.org/letters-comments-testimony-legal/",
+      "https://nvca.org/research/",
+      "https://nvca.org/pitchbook-nvca-venture-monitor/",
+      "https://nvca.org/2026-nvca-yearbook/",
+      "https://nvca.org/our-work/resources/",
+      "https://nvca.org/model-legal-documents/",
+      "https://nvca.org/ssbci-resources/",
+      "https://nvca.org/advisory-committees/",
+      "https://nvca.org/operating-principles/",
+      "https://nvca.org/preferred-provider-program2/",
+      "https://nvca.org/accounting-auditing-standards/",
+      "https://nvca.org/samara-hernandez-chingona-ventures/",
+      "https://nvca.org/derren-burrell-veteran-ventures-capital/",
+      "https://nvca.org/tatyana-hower-jobsohio-ventures/",
+      "https://nvca.org/bedy-yang-500-global/",
+      "https://nvca.org/jenny-rooke-genoa-ventures/",
+      "https://nvca.org/peter-micca-caduceus-capital-partners/",
+      "https://nvca.org/meet-a-vc/",
+      "https://nvca.org/",
+      "https://nvca.org/venture-forward/",
+      "https://nvca.org/peer-groups/",
+      "https://nvca.org/events/",
+      "https://nvca.org/resources/preferred-provider-program/"
+    ],
+    "cities": [
+      "Washington DC",
+      "San Francisco",
+      "New York",
+      "Boston"
+    ]
+  },
+  {
+    "name": "",
+    "company_name": "YNOS Venture Engine",
+    "investor_type": "Angel Investor",
+    "region": "India",
+    "sectors": [
+      "Healthcare",
+      "DeepTech"
+    ],
+    "tags": [
+      "Early Stage",
+      "Pre-Seed",
+      "Seed"
+    ],
+    "emails": [
+      "sales@ynos.in"
+    ],
+    "email_details": [
+      {
+        "email": "sales@ynos.in",
+        "source": "mailto",
+        "weight": 10,
+        "score": 4
+      }
+    ],
+    "email_score": 4,
+    "linkedin": [],
+    "linkedin_details": [],
+    "linkedin_score": 0,
+    "phones": [],
+    "latest_year": null,
+    "is_fresh": false,
+    "website": "https://ynos.in/solutions/for-startups-and-founders",
+    "source_url": "https://ynos.in/solutions/for-startups-and-founders",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 14,
+    "status_code": 200,
+    "hq_city": "Chennai",
+    "confidence": "HIGH",
+    "source_count": 9,
+    "all_sources": [
+      "https://ynos.in/solutions/for-startups-and-founders",
+      "https://ynos.in/products",
+      "https://ynos.in/products/angels",
+      "https://ynos.in/products/vcs",
+      "https://ynos.in/products/government-funding",
+      "https://ynos.in/products/debt-funding",
+      "https://ynos.in/products/insight",
+      "https://ynos.in/vibgyor",
+      "https://ynos.in/solutions"
+    ],
+    "cities": [
+      "Chennai",
+      "Bangalore",
+      "Mumbai",
+      "Delhi"
+    ]
+  },
+  {
+    "name": "",
+    "company_name": "Sebi",
+    "investor_type": "Venture Capital",
+    "region": "India",
+    "sectors": [
+      "Cybersecurity",
+      "FinTech",
+      "Healthcare"
+    ],
+    "tags": [
+      "Global",
+      "Series A"
+    ],
+    "emails": [],
+    "email_details": [],
+    "email_score": 0,
+    "linkedin": [],
+    "linkedin_details": [],
+    "linkedin_score": 0,
+    "phones": [
+      "+9102226449570",
+      "18002667575"
+    ],
+    "latest_year": 2026,
+    "is_fresh": true,
+    "website": "https://sebi.gov.in",
+    "source_url": "https://sebi.gov.in",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 8,
+    "status_code": 200,
+    "hq_city": "Mumbai",
+    "confidence": "HIGH",
+    "source_count": 77,
+    "all_sources": [
+      "https://sebi.gov.in",
+      "https://sebi.gov.in/",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes",
+      "https://sebi.gov.in/PACL.html",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=25",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=22",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=4",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=29",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=16",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=21",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=71",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=23",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=9",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=10",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=8",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=5",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=11",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=26",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=65",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=47",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=1",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=7",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=18",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=3",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=13",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=14",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=59",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=17",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=28",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=24",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=6",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=2",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=64",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=19",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=12",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=74",
+      "https://sebi.gov.in/sebiweb/home/HomeAction.do?doListingAll=yes&cid=77",
+      "https://sebi.gov.in/alldepartment.html",
+      "https://sebi.gov.in/department/alternative-investment-fund-and-foreign-portfolio-investors-department-75/overview.html",
+      "https://sebi.gov.in/department/board-cell-95/overview.html",
+      "https://sebi.gov.in/department/communications-department-42/overview.html",
+      "https://sebi.gov.in/department/corporation-finance-department-1/overview.html",
+      "https://sebi.gov.in/department/corporation-finance-investigation-department-73/overview.html",
+      "https://sebi.gov.in/department/department-economic-and-policy-analysis-3/overview.html",
+      "https://sebi.gov.in/department/department-of-debt-and-hybrid-securities-64/overview.html",
+      "https://sebi.gov.in/department/enforcement-department-1-6/overview.html",
+      "https://sebi.gov.in/department/enquiries-and-adjudication-department-5/overview.html",
+      "https://sebi.gov.in/department/general-services-department-1-85/overview.html",
+      "https://sebi.gov.in/department/general-services-department-2-84/overview.html",
+      "https://sebi.gov.in/department/general-services-department-3-83/overview.html",
+      "https://sebi.gov.in/department/human-resources-department-37/overview.html",
+      "https://sebi.gov.in/department/information-technology-department-35/overview.html",
+      "https://sebi.gov.in/department/integrated-surveillance-department-10/overview.html",
+      "https://sebi.gov.in/department/investigations-department-11/overview.html",
+      "https://sebi.gov.in/department/internal-inspection-department-79/overview.html",
+      "https://sebi.gov.in/department/investment-management-department-9/overview.html",
+      "https://sebi.gov.in/department/market-intermediaries-regulation-and-supervision-department-14/overview.html",
+      "https://sebi.gov.in/department/market-regulation-department-15/overview.html",
+      "https://sebi.gov.in/department/national-institute-of-securities-markets-86/overview.html",
+      "https://sebi.gov.in/department/office-of-international-affairs-36/overview.html",
+      "https://sebi.gov.in/department/office-of-investor-assistance-and-education-19/overview.html",
+      "https://sebi.gov.in/department/office-of-ethics-and-compliance-98/overview.html",
+      "https://sebi.gov.in/department/office-of-the-chairperson-17/overview.html",
+      "https://sebi.gov.in/department/office-of-wtm-91/overview.html",
+      "https://sebi.gov.in/department/pacl-committtee-93/overview.html",
+      "https://sebi.gov.in/department/parliament-questions-pq-cell-and-right-to-information-rti-cell-97/overview.html",
+      "https://sebi.gov.in/department/prosecution-and-settlement-department-81/overview.html",
+      "https://sebi.gov.in/department/quasi-judicial-cell-77/overview.html",
+      "https://sebi.gov.in/department/regional-offices-43/overview.html",
+      "https://sebi.gov.in/department/vigilance-department-67/overview.html",
+      "https://sebi.gov.in/department/recovery-and-refund-department-68/overview.html",
+      "https://sebi.gov.in/department/regulatory-review-cell-88/overview.html",
+      "https://sebi.gov.in/department/sat-sc-department-90/overview.html",
+      "https://sebi.gov.in/toll-free-helpline.html",
+      "https://sebi.gov.in/intermediaries.html",
+      "https://sebi.gov.in/statistics/statistics.html",
+      "https://sebi.gov.in/media/video1.html"
+    ],
+    "cities": [
+      "Mumbai",
+      "Delhi",
+      "Bangalore"
+    ]
+  },
+  {
+    "name": "Register Your Interest",
+    "company_name": "LVX",
+    "investor_type": "Family Fund",
+    "region": "India",
+    "sectors": [
+      "ECommerce",
+      "Mobility",
+      "FinTech",
+      "Healthcare",
+      "DeepTech",
+      "SpaceTech",
+      "EdTech",
+      "SaaS",
+      "AgriTech",
+      "Consumer",
+      "AI"
+    ],
+    "tags": [
+      "Early Stage",
+      "Series B",
+      "Global",
+      "Lead Investor",
+      "Seed",
+      "Pre-Seed",
+      "Series A",
+      "Follow On",
+      "B2B",
+      "B2C"
+    ],
+    "emails": [],
+    "email_details": [],
+    "email_score": 0,
+    "linkedin": [
+      "https://www.linkedin.com/company/lvxventures/",
+      "https://www.linkedin.com/in/shantimohanlv/",
+      "https://www.linkedin.com/in/vivekkhareatinfoedge/"
+    ],
+    "linkedin_details": [
+      {
+        "url": "https://www.linkedin.com/company/lvxventures/",
+        "score": 3
+      },
+      {
+        "url": "https://www.linkedin.com/in/shantimohanlv/",
+        "score": 5
+      },
+      {
+        "url": "https://www.linkedin.com/in/vivekkhareatinfoedge/",
+        "score": 5
+      }
+    ],
+    "linkedin_score": 15,
+    "phones": [],
+    "latest_year": 2026,
+    "is_fresh": true,
+    "website": "https://letsventure.com",
+    "source_url": "https://letsventure.com",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 29,
+    "status_code": 200,
+    "hq_city": "Bangalore",
+    "confidence": "HIGH",
+    "source_count": 73,
+    "all_sources": [
+      "https://letsventure.com",
+      "https://letsventure.com/investors",
+      "https://letsventure.com/",
+      "https://letsventure.com/debt-financing-for-startups",
+      "https://letsventure.com/angel-cohort",
+      "https://letsventure.com/founders",
+      "https://letsventure.com/elvix",
+      "https://letsventure.com/lvx-tribe",
+      "https://letsventure.com/lvx-day",
+      "https://letsventure.com/portfolio",
+      "https://letsventure.com/bharat-ke-super-founders",
+      "https://letsventure.com/lvx-in-news",
+      "https://letsventure.com/lvx-corridor-2026",
+      "https://letsventure.com/falcons-of-majlis",
+      "https://letsventure.com/editors-desk",
+      "https://letsventure.com/about-us",
+      "https://letsventure.com/start",
+      "https://letsventure.com/grow",
+      "https://letsventure.com/contact-us",
+      "https://letsventure.com/faq",
+      "https://letsventure.com/investor-ethics",
+      "https://letsventure.com/risks",
+      "https://letsventure.com/cancellation-and-refund-policy",
+      "https://letsventure.com/lv-debt-form",
+      "https://letsventure.com/blogs/how-much-money-do-you-need-for-angel-investing",
+      "https://letsventure.com/blogs/revenue-based-financing-an-emerging-asset-class-for-the-smart-investor",
+      "https://letsventure.com/blogs/debt-funding-checklist-startups-businesses-documents",
+      "https://letsventure.com/blogs/insights-on-lv-debt-and-our-commitment-to-make-fundraising-easy-and-transparent",
+      "https://letsventure.com/blogs/difference-between-equity-debt-funding-startups-emerging-businesses",
+      "https://letsventure.com/blogs/five-instances-when-debt-is-a-good-funding-choice-for-startups",
+      "https://letsventure.com/lvx-tribe/founder-mindset",
+      "https://letsventure.com/lvx-tribe/term-sheets-sha-legal-structuring",
+      "https://letsventure.com/lvx-tribe/building-product-services-gtm",
+      "https://letsventure.com/lvx-tribe/build-an-ai-native-company",
+      "https://letsventure.com/lvx-tribe/building-a-brand",
+      "https://letsventure.com/lvx-tribe/building-scaling-a-consumer-business",
+      "https://letsventure.com/lvx-tribe/deeptech-building-investing",
+      "https://letsventure.com/lvx-tribe/the-investor-perspective",
+      "https://letsventure.com/lvx-tribe/funding-universe-debt-family-offices-angels",
+      "https://letsventure.com/lvx-tribe/zero-to-ipo",
+      "https://letsventure.com/lvx-tribe/mis-financial-discipline-funding-readiness",
+      "https://letsventure.com/lvx-tribe/business-behind-the-startup",
+      "https://letsventure.com/blogs-old",
+      "https://letsventure.com/news",
+      "https://letsventure.com/videos-old",
+      "https://letsventure.com/podcasts",
+      "https://letsventure.com/lvx-in-news/lvx-bets-on-ai-to-transform-private-market-dealmaking-2",
+      "https://letsventure.com/lvx-in-news/investment-platform-lvx-launches-elvix-an-ai-tool-for-private-market-investors",
+      "https://letsventure.com/lvx-in-news/lvx-bets-on-ai-to-transform-private-market-dealmaking",
+      "https://letsventure.com/lvx-in-news/stylework-nets-inr-30-cr-to-scale-its-coworking-aggregation-play",
+      "https://letsventure.com/lvx-in-news/harajuku-tokyo-cafe-secures-2-mn-seed-funding-to-expand-across-india",
+      "https://letsventure.com/lvx-in-news/shaadi-mubarak-how-the-wedding-company-reshapes-wedding-planning-for-indias-middle-class",
+      "https://letsventure.com/lvx-in-news/testbook-raises-8-3-mn-series-b-to-add-more-state-level-exams",
+      "https://letsventure.com/lvx-in-news/investment-platform-letsventures-portfolio-now-valued-at-1-07-b",
+      "https://letsventure.com/lvx-in-news/innov8-to-double-its-seat-count-in-next-6-months-with-4-mn-fresh-funding",
+      "https://letsventure.com/lvx-in-news/y-combinator-alum-innov8-raises-funding-from-rajan-anandan-vijay-shekhar-sharma-letsventure-and-others",
+      "https://letsventure.com/lvx-in-news/having-more-than-500-campaigners-raising-funds-through-its-platform-ketto-aims-to-reach-100-mn-in-volumes-by-crowdfunding",
+      "https://letsventure.com/lvx-in-news/exclusive-edtech-startup-testbook-raises-funding-on-letsventure",
+      "https://letsventure.com/lvx-in-news/letsventure-rebrands-to-lvx-to-integrate-private-market-offerings",
+      "https://letsventure.com/lvx-in-news/letsventure-rebrands-as-lvx-and-expands-into-growth-stage-investment",
+      "https://letsventure.com/lvx-in-news/lvx-morphs-into-full-stack-platform-to-power-indias-growing-startup-ecosystem",
+      "https://letsventure.com/lvx-in-news/letsventures-shanti-mohan-launches-new-vc-fund-propell-to-invest-rs-50-cr-in-early-stage-startups",
+      "https://letsventure.com/lvx-in-news/letsventure-launches-angel-aif-may-enable-funding-worth-135-93-mn-in-next-2-years",
+      "https://letsventure.com/lvx-in-news/letsventure-brings-on-ratan-tata-and-mohandas-pai-as-advisors-investors",
+      "https://letsventure.com/lvx-in-news/you-can-be-an-angel-investor-too-but-it-takes-more-than-a-fat-wallet-to-be-one",
+      "https://letsventure.com/lvx-corridor-dubai",
+      "https://letsventure.com/from-editors-desk/a-start-up-in-politics-sure-its-innovation-zindabad",
+      "https://letsventure.com/from-editors-desk/start-ups-and-us-when-tv-actors-talk-funding-pitch-in-saas-bahu-soaps",
+      "https://letsventure.com/from-editors-desk/of-small-towns-and-their-big-dreams",
+      "https://letsventure.com/from-editors-desk/when-i-told-the-story-of-a-vardan-to-indias-start-up-dream",
+      "https://letsventure.com/old-home-2",
+      "https://letsventure.com/wall-of-startups",
+      "https://letsventure.com/newsletters"
+    ],
+    "cities": [
+      "Bangalore",
+      "Mumbai",
+      "Delhi"
+    ]
+  },
+  {
+    "name": "",
+    "company_name": "Village Global VC",
+    "investor_type": "Venture Capital",
+    "region": "USA",
+    "sectors": [
+      "AI",
+      "SaaS",
+      "FinTech",
+      "Healthcare",
+      "ECommerce"
+    ],
+    "tags": [
+      "Pre-Seed",
+      "Seed",
+      "Series A",
+      "Follow On",
+      "Global",
+      "Early Stage",
+      "B2B"
+    ],
+    "emails": [
+      "amrit@villageglobal.com",
+      "anne@villageglobal.com",
+      "ben@villageglobal.com"
+    ],
+    "email_details": [
+      {
+        "email": "amrit@villageglobal.com",
+        "source": "mailto",
+        "weight": 10,
+        "score": 7
+      },
+      {
+        "email": "anne@villageglobal.com",
+        "source": "mailto",
+        "weight": 10,
+        "score": 7
+      },
+      {
+        "email": "ben@villageglobal.com",
+        "source": "mailto",
+        "weight": 10,
+        "score": 7
+      }
+    ],
+    "email_score": 21,
+    "linkedin": [
+      "https://www.linkedin.com/company/villageglobal/",
+      "https://www.linkedin.com/in/reidhoffman",
+      "https://www.linkedin.com/in/amrit-rao/"
+    ],
+    "linkedin_details": [
+      {
+        "url": "https://www.linkedin.com/company/villageglobal/",
+        "score": 3
+      },
+      {
+        "url": "https://www.linkedin.com/in/reidhoffman",
+        "score": 5
+      },
+      {
+        "url": "https://www.linkedin.com/in/amrit-rao/",
+        "score": 5
+      }
+    ],
+    "linkedin_score": 15,
+    "phones": [],
+    "latest_year": 2026,
+    "is_fresh": true,
+    "website": "https://villageglobal.vc",
+    "source_url": "https://villageglobal.vc",
+    "crawl_type": "potential_investor_page",
+    "investor_score": 11,
+    "status_code": 200,
+    "hq_city": "San Francisco",
+    "confidence": "HIGH",
+    "source_count": 20,
+    "all_sources": [
+      "https://villageglobal.vc",
+      "https://villageglobal.vc/",
+      "https://villageglobal.vc/investing",
+      "https://villageglobal.vc/portfolio",
+      "https://villageglobal.vc/team",
+      "https://villageglobal.vc/velocity/village-velocity-x-wes-mckinney",
+      "https://villageglobal.vc/velocity",
+      "https://villageglobal.vc/velocity/apply",
+      "https://villageglobal.vc/insights/jake-saper-on-why-fast-growth-might-be-a-trap",
+      "https://villageglobal.vc/insights/evan-conrad-sf-compute-ai-bubble-gpu-offtake",
+      "https://villageglobal.vc/team/jacob-mullins",
+      "https://villageglobal.vc/team/jeff-lu",
+      "https://villageglobal.vc/team/lindsay-m-pettingill",
+      "https://villageglobal.vc/team/erik-torenberg",
+      "https://villageglobal.vc/insights/henry-shi-anthropic-why-founders-join-ai-labs",
+      "https://villageglobal.vc/insights/the-future-of-ai-agents-with-amjad-masad",
+      "https://villageglobal.vc/insights/reference-checking-best-practices-with-graham-duncan",
+      "https://villageglobal.vc/insights/lessons-from-luminaries-mark-pincus-on-product-management-raising-capital-and-building-zynga",
+      "https://villageglobal.vc/insights/village-global-is-hiring-an-investor",
+      "https://villageglobal.vc/insights/lessons-from-luminaries-eric-schmidt-tyler-cowen-on-the-future-of-technology-society"
+    ],
+    "cities": [
+      "San Francisco",
+      "New York",
+      "Delhi",
+      "Bangalore"
+    ]
+  }
+]
