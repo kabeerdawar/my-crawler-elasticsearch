@@ -37,7 +37,7 @@
   .filters input { max-width: 400px; }
   select { padding: 12px; border: 1px solid #ccd2dc; border-radius: 9px; background: white; }
   .table-container { background: white; border-radius: 14px; overflow-x: auto; box-shadow: 0 3px 12px rgba(0,0,0,0.06); }
-  table { width: 100%; border-collapse: collapse; min-width: 1800px; }
+  table { width: 100%; border-collapse: collapse; min-width: 1900px; }
   th { background: #111827; color: white; padding: 14px; text-align: left; font-size: 13px; }
   td { padding: 14px; border-bottom: 1px solid #e5e7eb; vertical-align: top; font-size: 13px; }
   tr:hover { background: #fafafa; }
@@ -49,7 +49,6 @@
   .badge.yellow { background: #fef3c7; color: #92400e; }
   .badge.gray { background: #e5e7eb; color: #374151; }
   .badge.blue { background: #dbeafe; color: #1d4ed8; }
-  .badge.red { background: #fee2e2; color: #b91c1c; }
   @media (max-width: 900px) {
     .cards { grid-template-columns: repeat(2, 1fr); }
     .input-row, .filters { flex-direction: column; }
@@ -74,7 +73,6 @@
       <span onclick="useExample('investors in Delhi')">investors in Delhi</span>
       <span onclick="useExample('investors in San Francisco')">investors in San Francisco</span>
       <span onclick="useExample('European investors')">European investors</span>
-      <span onclick="useExample('Indian fintech angel investors')">Indian fintech angels</span>
       <span onclick="useExample('US AI seed investors')">US AI seed</span>
     </div>
     <div id="status" class="status"></div>
@@ -109,13 +107,6 @@
       <option value="">All Records</option>
       <option value="has">Has Email</option>
       <option value="strong">Strong Email (score ≥ 5)</option>
-      <option value="verified">Verified Email (mailto)</option>
-    </select>
-    <select id="linkedinFilter" onchange="filterResults()">
-      <option value="">All LinkedIn</option>
-      <option value="has">Has LinkedIn</option>
-      <option value="personal">Personal Profile (score = 5)</option>
-      <option value="strong">Strong LinkedIn (score ≥ 3)</option>
     </select>
     <select id="confidenceFilter" onchange="filterResults()">
       <option value="">All Confidence</option>
@@ -126,8 +117,8 @@
       <option value="score">Sort: Investor Score</option>
       <option value="email">Sort: Email Score</option>
       <option value="linkedin">Sort: LinkedIn Score</option>
-      <option value="combined">Sort: Combined Contact Score</option>
-      <option value="confidence">Sort: Confidence (HIGH first)</option>
+      <option value="combined">Sort: Combined Contact</option>
+      <option value="confidence">Sort: Confidence</option>
     </select>
   </div>
 
@@ -138,11 +129,11 @@
           <th>Name</th><th>Company</th><th>Investor Type</th><th>Region</th>
           <th>Sectors</th><th>Tags</th><th>Emails</th><th>LinkedIn</th>
           <th>Investor Score</th><th>Email Score</th><th>LinkedIn Score</th>
-          <th>Confidence</th><th>Fresh</th><th>Source</th>
+          <th>Confidence</th><th>Sources</th><th>Fresh</th><th>Source</th>
         </tr>
       </thead>
       <tbody id="resultsBody">
-        <tr><td colspan="14" class="empty">Enter a query above to discover investors.</td></tr>
+        <tr><td colspan="15" class="empty">Enter a query above to discover investors.</td></tr>
       </tbody>
     </table>
   </div>
@@ -229,7 +220,7 @@ async function crawlSelected() {
     const res = await fetch("/crawl", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ urls: selected, query: document.getElementById("queryInput").value.trim() })
+      body: JSON.stringify({ urls: selected })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Crawl failed");
@@ -250,12 +241,9 @@ async function crawlSelected() {
 
 function updateDashboard() {
   document.getElementById("recordCount").textContent = allResults.length;
-  document.getElementById("highCount").textContent =
-    allResults.filter(r => r.confidence === "HIGH").length;
-  document.getElementById("emailCount").textContent =
-    allResults.filter(r => r.emails && r.emails.length > 0).length;
-  document.getElementById("freshCount").textContent =
-    allResults.filter(r => r.is_fresh).length;
+  document.getElementById("highCount").textContent = allResults.filter(r => r.confidence === "HIGH").length;
+  document.getElementById("emailCount").textContent = allResults.filter(r => r.emails && r.emails.length > 0).length;
+  document.getElementById("freshCount").textContent = allResults.filter(r => r.is_fresh).length;
 }
 
 function populateFilters() {
@@ -279,7 +267,6 @@ function filterResults() {
   const type = document.getElementById("typeFilter").value;
   const region = document.getElementById("regionFilter").value;
   const emailFilter = document.getElementById("emailFilter").value;
-  const linkedinFilter = document.getElementById("linkedinFilter").value;
   const confidenceFilter = document.getElementById("confidenceFilter").value;
   const sort = document.getElementById("sortFilter").value;
 
@@ -293,32 +280,21 @@ function filterResults() {
     let matchesEmail = true;
     if (emailFilter === "has") matchesEmail = r.emails && r.emails.length > 0;
     else if (emailFilter === "strong") matchesEmail = (r.email_details || []).some(e => e.score >= 5);
-    else if (emailFilter === "verified") matchesEmail = (r.email_details || []).some(e => e.source === "mailto");
-
-    let matchesLinkedIn = true;
-    if (linkedinFilter === "has") matchesLinkedIn = r.linkedin && r.linkedin.length > 0;
-    else if (linkedinFilter === "personal") matchesLinkedIn = (r.linkedin_details || []).some(l => l.score === 5);
-    else if (linkedinFilter === "strong") matchesLinkedIn = (r.linkedin_details || []).some(l => l.score >= 3);
 
     let matchesConfidence = true;
     if (confidenceFilter === "HIGH") matchesConfidence = r.confidence === "HIGH";
     else if (confidenceFilter === "MEDIUM") matchesConfidence = r.confidence === "MEDIUM";
 
-    return matchesSearch && matchesType && matchesRegion && matchesEmail && matchesLinkedIn && matchesConfidence;
+    return matchesSearch && matchesType && matchesRegion && matchesEmail && matchesConfidence;
   });
 
-  if (sort === "email") {
-    filtered.sort((a, b) => (b.email_score || 0) - (a.email_score || 0));
-  } else if (sort === "linkedin") {
-    filtered.sort((a, b) => (b.linkedin_score || 0) - (a.linkedin_score || 0));
-  } else if (sort === "combined") {
-    filtered.sort((a, b) => ((b.email_score || 0) + (b.linkedin_score || 0)) - ((a.email_score || 0) + (a.linkedin_score || 0)));
-  } else if (sort === "confidence") {
+  if (sort === "email") filtered.sort((a, b) => (b.email_score || 0) - (a.email_score || 0));
+  else if (sort === "linkedin") filtered.sort((a, b) => (b.linkedin_score || 0) - (a.linkedin_score || 0));
+  else if (sort === "combined") filtered.sort((a, b) => ((b.email_score || 0) + (b.linkedin_score || 0)) - ((a.email_score || 0) + (a.linkedin_score || 0)));
+  else if (sort === "confidence") {
     const rank = { HIGH: 2, MEDIUM: 1 };
     filtered.sort((a, b) => (rank[b.confidence] || 0) - (rank[a.confidence] || 0));
-  } else {
-    filtered.sort((a, b) => (b.investor_score || 0) - (a.investor_score || 0));
-  }
+  } else filtered.sort((a, b) => (b.investor_score || 0) - (a.investor_score || 0));
 
   renderResults(filtered);
 }
@@ -327,7 +303,7 @@ function renderResults(results) {
   const body = document.getElementById("resultsBody");
 
   if (results.length === 0) {
-    body.innerHTML = '<tr><td colspan="14" class="empty">No matching records.</td></tr>';
+    body.innerHTML = '<tr><td colspan="15" class="empty">No matching records.</td></tr>';
     return;
   }
 
@@ -349,9 +325,7 @@ function renderResults(results) {
         }).join("")
       : (r.linkedin || []).map(u => `<div><a href="${u}" target="_blank">Profile</a></div>`).join("") || "-";
 
-    const source = r.source_url
-      ? `<a href="${r.source_url}" target="_blank">Open</a>`
-      : "-";
+    const source = r.source_url ? `<a href="${r.source_url}" target="_blank">Open</a>` : "-";
 
     const regionDisplay = r.hq_city
       ? `${escapeHtml(r.region || "-")} (${escapeHtml(r.hq_city)})`
@@ -364,6 +338,8 @@ function renderResults(results) {
     const fresh = r.is_fresh
       ? `<span class="badge green">${r.latest_year || "yes"}</span>`
       : '<span class="badge gray">old</span>';
+
+    const sourceCount = r.source_count || 1;
 
     return `
       <tr>
@@ -379,6 +355,7 @@ function renderResults(results) {
         <td>${r.email_score ?? 0}</td>
         <td>${r.linkedin_score ?? 0}</td>
         <td>${confidence}</td>
+        <td>${sourceCount}</td>
         <td>${fresh}</td>
         <td>${source}</td>
       </tr>`;
@@ -387,13 +364,13 @@ function renderResults(results) {
 
 function downloadCSV() {
   if (allResults.length === 0) { alert("No results."); return; }
-  const headers = ["Name","Company","Investor Type","Region","City","Sectors","Tags","Emails","Email Score","LinkedIn","LinkedIn Score","Confidence","Fresh","Latest Year","Investor Score","Source"];
+  const headers = ["Name","Company","Investor Type","Region","City","Sectors","Tags","Emails","Email Score","LinkedIn","LinkedIn Score","Confidence","Sources","Fresh","Latest Year","Investor Score","Source"];
   const rows = allResults.map(r => [
     r.name || "", r.company_name || "", r.investor_type || "", r.region || "", r.hq_city || "",
     (r.sectors || []).join("; "), (r.tags || []).join("; "),
     (r.emails || []).join("; "), r.email_score ?? 0,
     (r.linkedin || []).join("; "), r.linkedin_score ?? 0,
-    r.confidence || "", r.is_fresh ? "yes" : "no", r.latest_year || "",
+    r.confidence || "", r.source_count || 1, r.is_fresh ? "yes" : "no", r.latest_year || "",
     r.investor_score ?? "", r.source_url || ""
   ]);
   saveCSV(headers, rows, "investor-results.csv");
@@ -406,10 +383,7 @@ function downloadEmailsCSV() {
   const rows = [];
   withEmails.forEach(r => {
     (r.email_details || r.emails.map(e => ({ email: e, source: "body", score: 1 }))).forEach(e => {
-      rows.push([
-        r.company_name || "", r.investor_type || "", r.region || "", r.hq_city || "",
-        e.email, e.source, e.score, r.confidence || "", r.source_url || ""
-      ]);
+      rows.push([r.company_name || "", r.investor_type || "", r.region || "", r.hq_city || "", e.email, e.source, e.score, r.confidence || "", r.source_url || ""]);
     });
   });
   saveCSV(headers, rows, "investor-emails.csv");
@@ -423,19 +397,14 @@ function downloadLinkedInCSV() {
   withLI.forEach(r => {
     (r.linkedin_details || r.linkedin.map(u => ({ url: u, score: 1 }))).forEach(l => {
       const type = l.score === 5 ? "profile" : (l.score >= 3 ? "company" : "page");
-      rows.push([
-        r.company_name || "", r.investor_type || "", r.region || "", r.hq_city || "",
-        l.url, type, l.score, r.confidence || "", r.source_url || ""
-      ]);
+      rows.push([r.company_name || "", r.investor_type || "", r.region || "", r.hq_city || "", l.url, type, l.score, r.confidence || "", r.source_url || ""]);
     });
   });
   saveCSV(headers, rows, "investor-linkedin.csv");
 }
 
 function saveCSV(headers, rows, filename) {
-  const csv = [headers, ...rows]
-    .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
-    .join("\n");
+  const csv = [headers, ...rows].map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

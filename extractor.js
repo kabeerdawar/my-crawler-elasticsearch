@@ -8,6 +8,58 @@ function unique(values) {
   return [...new Set(values.map(v => cleanText(v)).filter(Boolean))];
 }
 
+// ---------- JSON-LD ----------
+function findJsonLd($) {
+  const result = { name: "", description: "", url: "", email: "", phone: "", address: "", industry: "", founders: [], social: {} };
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      let json = $(el).html();
+      if (!json) return;
+      json = JSON.parse(json);
+      const items = Array.isArray(json) ? json : [json];
+      for (const item of items) {
+        const type = item["@type"];
+        if (!type) continue;
+        if (/Organization|Corporation|LocalBusiness|FinancialService/.test(type)) {
+          if (item.name && !result.name) result.name = item.name;
+          if (item.description && !result.description) result.description = item.description;
+          if (item.url && !result.url) result.url = item.url;
+          if (item.email && !result.email) result.email = item.email;
+          if (item.telephone && !result.phone) result.phone = item.telephone;
+          if (item.industry && !result.industry) result.industry = item.industry;
+          if (item.address && !result.address) {
+            const a = item.address;
+            result.address = [a.streetAddress, a.addressLocality, a.addressRegion, a.addressCountry].filter(Boolean).join(", ");
+          }
+          if (item.founder) {
+            const fs = Array.isArray(item.founder) ? item.founder : [item.founder];
+            for (const f of fs) {
+              if (typeof f === "string") result.founders.push(f);
+              else if (f.name) result.founders.push(f.name);
+            }
+          }
+          if (item.sameAs) {
+            const links = Array.isArray(item.sameAs) ? item.sameAs : [item.sameAs];
+            for (const link of links) {
+              if (/linkedin\.com/i.test(link)) result.social.linkedin = link;
+            }
+          }
+        }
+      }
+    } catch {}
+  });
+  return result;
+}
+
+// ---------- OPENGRAPH ----------
+function findOpenGraph($) {
+  const getMeta = (prop) => cleanText(
+    $(`meta[property="${prop}"]`).attr("content") ||
+    $(`meta[name="${prop}"]`).attr("content") || ""
+  );
+  return { siteName: getMeta("og:site_name"), title: getMeta("og:title"), description: getMeta("og:description"), url: getMeta("og:url") };
+}
+
 // ---------- INVESTOR TYPE ----------
 function findInvestorType(text) {
   const t = text.toLowerCase();
@@ -19,10 +71,9 @@ function findInvestorType(text) {
   return "";
 }
 
-// ---------- REGION (MAJORITY VOTE) ----------
+// ---------- REGION ----------
 function findRegion(text) {
   const t = text.toLowerCase();
-
   const regions = {
     India: ["india","mumbai","delhi","new delhi","bangalore","bengaluru","hyderabad","chennai","pune","gurugram","gurgaon","ahmedabad","kolkata"],
     USA: ["united states","usa","new york","san francisco","california","boston","los angeles","texas","silicon valley","bay area","menlo park","palo alto"],
@@ -31,7 +82,6 @@ function findRegion(text) {
     Middle_East: ["dubai","abu dhabi","uae","united arab emirates","saudi arabia","riyadh"],
     Southeast_Asia: ["singapore","indonesia","malaysia","thailand","vietnam"]
   };
-
   const counts = {};
   for (const [region, keys] of Object.entries(regions)) {
     let count = 0;
@@ -42,13 +92,10 @@ function findRegion(text) {
     }
     counts[region] = count;
   }
-
-  let topRegion = "";
-  let topCount = 0;
+  let topRegion = ""; let topCount = 0;
   for (const [region, count] of Object.entries(counts)) {
     if (count > topCount) { topCount = count; topRegion = region; }
   }
-
   if (topCount < 3) return "";
   return topRegion;
 }
@@ -120,11 +167,7 @@ const VALID_TLDS = new Set([
   "partners","investments","holdings","ltd","inc"
 ]);
 
-const BLOCKED_LOCAL_PARTS = [
-  "noreply","no-reply","donotreply","do-not-reply",
-  "postmaster","abuse","webmaster","hostmaster",
-  "press","media","pr","news","marketing"
-];
+const BLOCKED_LOCAL_PARTS = ["noreply","no-reply","donotreply","do-not-reply","postmaster","abuse","webmaster","hostmaster","press","media","pr","news","marketing"];
 
 const BLOCKED_DOMAINS = [
   "example.com","example.org","example.net","test.com","domain.com","yourdomain.com",
@@ -137,23 +180,15 @@ const BLOCKED_DOMAINS = [
   "instagram.com","linkedin.com"
 ];
 
-const GENERIC_LOCALS = [
-  "info","contact","hello","admin","support","sales","team","office",
-  "enquiries","enquiry","inquiries","inquiry","help","mail"
-];
+const GENERIC_LOCALS = ["info","contact","hello","admin","support","sales","team","office","enquiries","enquiry","inquiries","inquiry","help","mail"];
 
 function looksLikeJunk(email) {
   const local = email.split("@")[0] || "";
   if (local.length > 30) return true;
   if (/[a-z]{15,}/.test(local)) return true;
-  if (local.length > 8) {
-    const half = Math.floor(local.length / 2);
-    if (local.slice(0, half) === local.slice(half, half * 2)) return true;
-  }
   if (/mailto|http|www/i.test(local)) return true;
   if (/^u003/i.test(local)) return true;
   if (/^[0-9a-f]{16,}$/i.test(local)) return true;
-  if (/^[a-f0-9-]{20,}$/i.test(local)) return true;
   if (/^\d+$/.test(local)) return true;
   if (/^(privacy|legal|terms|cookies|gdpr|dmca|abuse|accessibility)/.test(local)) return true;
   return false;
@@ -165,22 +200,15 @@ function isValidEmail(email) {
   if (parts.length !== 2) return false;
   const [local, domain] = parts;
   if (!local || !domain) return false;
-
   const localLower = local.toLowerCase();
   const domainLower = domain.toLowerCase();
-
   if (!domainLower.includes(".")) return false;
   if (/\.\./.test(localLower) || /\.\./.test(domainLower)) return false;
-  if (localLower.startsWith(".") || localLower.endsWith(".")) return false;
-
   const tld = domainLower.split(".").pop();
   if (!VALID_TLDS.has(tld)) return false;
-
   if (BLOCKED_LOCAL_PARTS.includes(localLower)) return false;
   if (BLOCKED_DOMAINS.includes(domainLower)) return false;
   if (BLOCKED_DOMAINS.some(b => domainLower.endsWith("." + b))) return false;
-  if (/\.(png|jpg|jpeg|gif|svg|webp|css|js|ico)$/i.test(domainLower)) return false;
-
   if (looksLikeJunk(email)) return false;
   return true;
 }
@@ -188,138 +216,122 @@ function isValidEmail(email) {
 function scoreEmail(email, source, weight) {
   const local = email.split("@")[0].toLowerCase();
   const isGeneric = GENERIC_LOCALS.includes(local);
-
   if (source === "mailto") return isGeneric ? 4 : 7;
   if (source === "data-attr") return isGeneric ? 3 : 5;
+  if (source === "json-ld") return isGeneric ? 4 : 7;
   if (weight >= 6) return isGeneric ? 3 : 6;
   if (weight >= 5) return isGeneric ? 2 : 4;
   return isGeneric ? 1 : 2;
 }
 
-function findEmails($, text, url = "") {
+function findEmails($, text, url = "", jsonLd = null) {
   const found = new Map();
-
-  // Detect portfolio/companies pages — skip body emails there
   const isPortfolioPage = /portfolio|companies|investments|backed|funded/i.test(url);
+  let firmBaseDomain = "";
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    firmBaseDomain = host.split(".").slice(-2).join(".");
+  } catch {}
 
   function add(email, source, weight) {
-    email = String(email || "").toLowerCase().trim();
-    email = email.replace(/[.,;:!?]+$/, "");
-    email = email.replace(/^[^\w]+/, "");
+    email = String(email || "").toLowerCase().trim().replace(/[.,;:!?]+$/, "");
     if (!isValidEmail(email)) return;
-    const prev = found.get(email);
-    if (!prev || prev.weight < weight) {
-      found.set(email, { source, weight });
+    if (source !== "mailto" && source !== "data-attr" && source !== "json-ld" && firmBaseDomain) {
+      const emailDomain = email.split("@")[1];
+      if (!emailDomain) return;
+      const emailBase = emailDomain.split(".").slice(-2).join(".");
+      const personal = ["gmail.com","yahoo.com","outlook.com","hotmail.com","icloud.com"];
+      if (emailBase !== firmBaseDomain && !personal.includes(emailDomain)) return;
     }
+    const prev = found.get(email);
+    if (!prev || prev.weight < weight) found.set(email, { source, weight });
   }
 
-  // 1. mailto — always safe
+  if (jsonLd && jsonLd.email) add(jsonLd.email, "json-ld", 12);
   $('a[href^="mailto:"]').each((_, el) => {
     const href = $(el).attr("href") || "";
     const raw = href.replace(/^mailto:/i, "").split("?")[0].trim();
     add(raw, "mailto", 10);
   });
+  $("[data-email]").each((_, el) => add($(el).attr("data-email") || "", "data-attr", 8));
 
-  // 2. data-email
-  $("[data-email]").each((_, el) => {
-    const v = $(el).attr("data-email") || "";
-    add(v, "data-attr", 8);
-  });
-
-  // 3. body text — ONLY if not portfolio page
   if (!isPortfolioPage) {
-    const cleanBody = text
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ");
-
+    const cleanBody = text.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ");
     const matches = cleanBody.match(EMAIL_REGEX) || [];
     for (const m of matches) {
       const idx = cleanBody.toLowerCase().indexOf(m.toLowerCase());
       const context = cleanBody.slice(Math.max(0, idx - 100), idx + m.length + 100).toLowerCase();
-
       let weight = 3;
       if (/contact|email|reach|enquir|inquir|write to/.test(context)) weight = 6;
       if (/partner|founder|investor|principal|managing director/.test(context)) weight = 7;
-
       add(m, "body", weight);
     }
   }
 
   return [...found.entries()]
-    .map(([email, meta]) => {
-      const score = scoreEmail(email, meta.source, meta.weight);
-      return { email, source: meta.source, weight: meta.weight, score };
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
+    .map(([email, meta]) => ({ email, source: meta.source, weight: meta.weight, score: scoreEmail(email, meta.source, meta.weight) }))
+    .sort((a, b) => b.score - a.score).slice(0, 5);
 }
 
 // ---------- LINKEDIN ----------
-function findLinkedIn($) {
+function findLinkedIn($, jsonLd = null) {
   const found = new Map();
   const seenPaths = new Set();
+
+  if (jsonLd && jsonLd.social && jsonLd.social.linkedin) {
+    try {
+      const parsed = new URL(jsonLd.social.linkedin);
+      const parts = parsed.pathname.toLowerCase().split("/").filter(Boolean);
+      if (parts.length >= 2) {
+        seenPaths.add(`${parts[0]}/${parts[1]}`);
+        found.set(jsonLd.social.linkedin, { url: jsonLd.social.linkedin, score: parts[0] === "in" ? 5 : 3 });
+      }
+    } catch {}
+  }
 
   $("a").each((_, el) => {
     const href = $(el).attr("href");
     if (!href || !href.toLowerCase().includes("linkedin.com")) return;
-
     try {
       const parsed = new URL(href);
-      parsed.hash = "";
-      parsed.search = "";
+      parsed.hash = ""; parsed.search = "";
       const url = parsed.href;
       const path = parsed.pathname.toLowerCase();
-
       if (path.includes("/share") || path.includes("sharearticle")) return;
-
-      const pathParts = path.split("/").filter(Boolean);
-      if (pathParts.length < 2) return;
-
-      const type = pathParts[0];
-      const slug = pathParts[1];
+      const parts = path.split("/").filter(Boolean);
+      if (parts.length < 2) return;
+      const type = parts[0]; const slug = parts[1];
       const dedupeKey = `${type}/${slug}`;
       if (seenPaths.has(dedupeKey)) return;
       seenPaths.add(dedupeKey);
-
       let score = 1;
       if (type === "in") score = 5;
       else if (type === "company") score = 3;
-
       found.set(url, { url, score });
     } catch {}
   });
 
-  return [...found.values()]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
+  return [...found.values()].sort((a, b) => b.score - a.score).slice(0, 10);
 }
 
 // ---------- PHONES ----------
 function findPhones(text) {
   const matches = text.match(/(?:\+?\d[\d\s().-]{7,}\d)/g);
   if (!matches) return [];
-  return unique(
-    matches.map(p => p.replace(/[^\d+]/g, "").trim()).filter(p => {
-      const d = p.replace(/\D/g, "");
-      return d.length >= 10 && d.length <= 15;
-    })
-  ).slice(0, 2);
+  return unique(matches.map(p => p.replace(/[^\d+]/g, "").trim()).filter(p => {
+    const d = p.replace(/\D/g, "");
+    return d.length >= 10 && d.length <= 15;
+  })).slice(0, 2);
 }
 
 // ---------- NAME ----------
 function findName($, text) {
-  const selectors = [
-    '[itemprop="name"]',
-    ".investor-name",".person-name",
-    ".profile-name",".team-member-name"
-  ];
+  const selectors = ['[itemprop="name"]',".investor-name",".person-name",".profile-name",".team-member-name"];
   for (const s of selectors) {
     const v = cleanText($(s).first().text());
     if (v && v.split(/\s+/).length >= 2 && v.split(/\s+/).length <= 4 && v.length < 60) return v;
   }
-  const patterns = [
-    /(?:partner|founder|co-founder|investor|principal|director|managing partner)\s*[:\-]\s*([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){1,3})/
-  ];
+  const patterns = [/(?:partner|founder|co-founder|investor|principal|director|managing partner)\s*[:\-]\s*([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){1,3})/];
   for (const p of patterns) {
     const m = text.match(p);
     if (m) return cleanText(m[1]);
@@ -327,87 +339,154 @@ function findName($, text) {
   return "";
 }
 
-// ---------- COMPANY (STRICT) ----------
-function findCompany($, url) {
-  // 1. og:site_name is most reliable
-  const siteName = cleanText($('meta[property="og:site_name"]').attr("content") || "");
-  if (siteName && siteName.length > 1 && siteName.length < 60 &&
-      !/^(home|welcome|blog|news)$/i.test(siteName)) {
-    return siteName;
+// ---------- COMPANY ----------
+function findCompany($, url, jsonLd = null, og = null) {
+  if (jsonLd && jsonLd.name && jsonLd.name.length < 80) return jsonLd.name;
+  if (og && og.siteName && og.siteName.length < 60 && !/^(home|welcome|blog|news)$/i.test(og.siteName)) {
+    return og.siteName;
   }
-
-  // 2. Schema
   const legal = cleanText($('[itemprop="legalName"]').first().text());
   if (legal && legal.length < 80) return legal;
-
-  // 3. Common class selectors
   const selectors = [".company-name",".firm-name",".fund-name",".organization-name"];
   for (const s of selectors) {
     const v = cleanText($(s).first().text());
     if (v && v.length < 80) return v;
   }
-
-  // 4. Title (with junk filter)
   const title = cleanText($("title").first().text());
   if (title) {
-    const cleaned = title
-      .replace(/\s*[\|\-–—]\s*.*$/, "")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    const junkPhrases = [
-      "top ","best ","how to ","guide to ","legal ","privacy ",
-      "terms ","disclosure","cookie","faq","blog","news",
-      "founders go","investing in","we invest","insights","report",
-      "unlocked","the ","our ","home","profile","welcome",
-      "investing profile","investor profile","about ","contact ",
-      "page not","error","404","sign in","log in"
-    ];
-    const lowerCleaned = cleaned.toLowerCase();
-    const isJunk = junkPhrases.some(p => lowerCleaned.includes(p));
-    if (isJunk) return "";
-    if (lowerCleaned === "home") return "";
-
-    if (cleaned.length < 60 &&
-        !cleaned.includes(":") &&
-        !cleaned.includes("'s ") &&
-        cleaned.split(/\s+/).length <= 5) {
+    const cleaned = title.replace(/\s*[\|\-–—]\s*.*$/, "").replace(/\s+/g, " ").trim();
+    const junk = ["top ","best ","how to ","how we ","guide to ","legal ","privacy ","terms ","disclosure","cookie","faq","blog","news","home","we invest","insights","report","profile","about ","contact ","sign in","log in"];
+    const low = cleaned.toLowerCase();
+    if (!junk.some(p => low.includes(p)) && cleaned.length < 60 && !cleaned.includes(":") && cleaned.split(/\s+/).length <= 5) {
       return cleaned;
     }
   }
-
-  // 5. Fallback: derive from URL
   try {
     const host = new URL(url).hostname.replace(/^www\./, "");
     const parts = host.split(".");
     if (parts.length >= 2) {
-      let name = parts[0];
-      name = name.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      let name = parts[0].replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
       name = name.replace(/\s+(Vc|Capital|Ventures|Investments|Partners|Holdings)$/i, "");
       return name;
     }
   } catch {}
-
   return "";
 }
 
-// ---------- MAIN ----------
+// ---------- EXTRACT MULTIPLE PEOPLE (STRICT) ----------
+function extractTeamMembers($, url, base) {
+  const people = [];
+  const seenLinkedIn = new Set();
+  const seenNames = new Set();
+
+  // 🎯 ONLY LinkedIn /in/ links with valid names
+  $('a[href*="linkedin.com/in/"]').each((_, el) => {
+    const href = $(el).attr("href");
+    if (!href) return;
+    try {
+      const parsed = new URL(href);
+      parsed.hash = ""; parsed.search = "";
+      const linkedinUrl = parsed.href;
+      const pathParts = parsed.pathname.toLowerCase().split("/").filter(Boolean);
+      if (pathParts.length < 2 || pathParts[0] !== "in") return;
+      const slug = pathParts[1];
+      if (seenLinkedIn.has(slug)) return;
+      seenLinkedIn.add(slug);
+
+      const $el = $(el);
+      let name = "";
+
+      const linkText = cleanText($el.text());
+      if (linkText && linkText.split(/\s+/).length >= 2 && linkText.split(/\s+/).length <= 4 && linkText.length < 60 && !/linkedin|profile|view/i.test(linkText)) {
+        name = linkText;
+      }
+      if (!name) {
+        const parent = $el.closest("div, li, article, section, td");
+        if (parent.length) {
+          const heading = cleanText(parent.find("h1, h2, h3, h4, h5, strong, .name, .person-name").first().text());
+          if (heading && heading.split(/\s+/).length >= 2 && heading.split(/\s+/).length <= 4 && heading.length < 60) name = heading;
+        }
+      }
+
+      // STRICT: must have valid name starting with capital
+      if (!name) return;
+      if (!/^[A-Z][a-z]+/.test(name)) return;
+      if (seenNames.has(name.toLowerCase())) return;
+      seenNames.add(name.toLowerCase());
+
+      let title = "";
+      const parent = $el.closest("div, li, article, section, td");
+      if (parent.length) {
+        const titleEl = parent.find(".title, .role, .position, .job-title, p").first().text();
+        if (titleEl) title = cleanText(titleEl).slice(0, 100);
+      }
+
+      let personEmail = "";
+      if (parent.length) {
+        const mailtoEl = parent.find('a[href^="mailto:"]').first();
+        if (mailtoEl.length) {
+          const mhref = mailtoEl.attr("href") || "";
+          const raw = mhref.replace(/^mailto:/i, "").split("?")[0].trim();
+          if (isValidEmail(raw)) personEmail = raw.toLowerCase();
+        }
+      }
+
+      const emailDetails = personEmail ? [{ email: personEmail, source: "mailto", weight: 10, score: 7 }] : [];
+
+      people.push({
+        name,
+        company_name: base.company_name,
+        investor_type: base.investor_type,
+        region: base.region,
+        sectors: base.sectors,
+        tags: base.tags,
+        description: title,
+        emails: personEmail ? [personEmail] : [],
+        email_details: emailDetails,
+        email_score: emailDetails.reduce((s, e) => s + e.score, 0),
+        linkedin: [linkedinUrl],
+        linkedin_details: [{ url: linkedinUrl, score: 5 }],
+        linkedin_score: 5,
+        phones: [],
+        latest_year: base.latest_year,
+        is_fresh: base.is_fresh,
+        website: base.website,
+        source_url: url,
+        crawl_type: "team_member"
+      });
+    } catch {}
+  });
+
+  return people;
+}
+
+// ---------- MAIN: single ----------
 function extractInvestorData($, url) {
   const text = cleanText($("body").text());
+  const jsonLd = findJsonLd($);
+  const og = findOpenGraph($);
 
-  const name = findName($, text);
-  const company_name = findCompany($, url);
-  const investor_type = findInvestorType(text);
-  const region = findRegion(text);
-  const sectors = findSectors(text);
+  const name = findName($, text) || (jsonLd.founders && jsonLd.founders[0]) || "";
+  const company_name = findCompany($, url, jsonLd, og);
+  let investor_type = findInvestorType(text + " " + (jsonLd.industry || ""));
+
+  if (company_name) {
+    const cn = company_name.toLowerCase();
+    if (/\bventures?\b|\bcapital\b|\bvc\b|\bventure\b/.test(cn)) investor_type = "Venture Capital";
+    else if (/\bfamily office\b|\bfamily fund\b/.test(cn)) investor_type = "Family Fund";
+    else if (/\bprivate equity\b|\bpe\b/.test(cn)) investor_type = "Private Equity";
+    else if (/\bangel\b|\bangels\b/.test(cn)) investor_type = "Angel Investor";
+  }
+
+  const region = findRegion(text + " " + (jsonLd.address || ""));
+  const sectors = findSectors(text + " " + (jsonLd.description || "") + " " + (jsonLd.industry || ""));
   const tags = findTags(text);
-  const emailDetails = findEmails($, text, url);
-  const linkedinDetails = findLinkedIn($);
-  const phones = findPhones(text);
+  const emailDetails = findEmails($, text, url, jsonLd);
+  const linkedinDetails = findLinkedIn($, jsonLd);
+  const phones = findPhones(text + " " + (jsonLd.phone || ""));
 
   const emails = emailDetails.map(e => e.email);
   const email_score = emailDetails.reduce((s, e) => s + e.score, 0);
-
   const linkedin = linkedinDetails.map(l => l.url);
   const linkedin_score = linkedinDetails.reduce((s, l) => s + l.score, 0);
 
@@ -415,28 +494,32 @@ function extractInvestorData($, url) {
   const isFresh = !!(latestYear && latestYear >= 2024);
 
   return {
-    name,
-    company_name,
-    investor_type,
-    region,
-    sectors,
-    tags,
-    emails,
-    email_details: emailDetails,
-    email_score,
-    linkedin,
-    linkedin_details: linkedinDetails,
-    linkedin_score,
-    phones,
-    latest_year: latestYear,
-    is_fresh: isFresh,
-    website: url,
+    name, company_name, investor_type, region, sectors, tags,
+    emails, email_details: emailDetails, email_score,
+    linkedin, linkedin_details: linkedinDetails, linkedin_score,
+    phones, latest_year: latestYear, is_fresh: isFresh,
+    description: jsonLd.description || og.description || "",
+    website: jsonLd.url || url,
     source_url: url,
-    crawl_type:
-      investor_type || sectors.length || tags.length || emails.length || linkedin.length
-        ? "potential_investor_page"
-        : "general_page"
+    crawl_type: (investor_type || sectors.length || tags.length || emails.length || linkedin.length) ? "potential_investor_page" : "general_page"
   };
 }
 
-module.exports = { extractInvestorData };
+// ---------- MAIN: multiple ----------
+function extractMultipleInvestors($, url) {
+  const base = extractInvestorData($, url);
+  const teamMembers = extractTeamMembers($, url, base);
+
+  if (teamMembers.length > 0) {
+    const hasFirmData = (base.emails && base.emails.length > 0) || base.description;
+    const hasCompanyOrName = base.company_name || base.name;
+    if (hasFirmData && hasCompanyOrName) {
+      return [base, ...teamMembers];
+    }
+    return teamMembers;
+  }
+
+  return [base];
+}
+
+module.exports = { extractInvestorData, extractMultipleInvestors };
