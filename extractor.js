@@ -8,6 +8,17 @@ function unique(values) {
   return [...new Set(values.map(v => cleanText(v)).filter(Boolean))];
 }
 
+function decodeCfEmail(hex) {
+  try {
+    const key = parseInt(hex.slice(0, 2), 16);
+    let email = "";
+    for (let i = 2; i < hex.length; i += 2) {
+      email += String.fromCharCode(parseInt(hex.substr(i, 2), 16) ^ key);
+    }
+    return email;
+  } catch { return null; }
+}
+
 // ---------- JSON-LD ----------
 function findJsonLd($) {
   const result = { name: "", description: "", url: "", email: "", phone: "", address: "", industry: "", founders: [], social: {} };
@@ -51,7 +62,6 @@ function findJsonLd($) {
   return result;
 }
 
-// ---------- OPENGRAPH ----------
 function findOpenGraph($) {
   const getMeta = (prop) => cleanText(
     $(`meta[property="${prop}"]`).attr("content") ||
@@ -60,7 +70,6 @@ function findOpenGraph($) {
   return { siteName: getMeta("og:site_name"), title: getMeta("og:title"), description: getMeta("og:description"), url: getMeta("og:url") };
 }
 
-// ---------- INVESTOR TYPE ----------
 function findInvestorType(text) {
   const t = text.toLowerCase();
   if (/family office|family fund|family investment office/.test(t)) return "Family Fund";
@@ -71,7 +80,6 @@ function findInvestorType(text) {
   return "";
 }
 
-// ---------- REGION ----------
 function findRegion(text) {
   const t = text.toLowerCase();
   const regions = {
@@ -100,7 +108,6 @@ function findRegion(text) {
   return topRegion;
 }
 
-// ---------- SECTORS ----------
 function findSectors(text) {
   const t = text.toLowerCase();
   const rules = {
@@ -125,7 +132,6 @@ function findSectors(text) {
   return found;
 }
 
-// ---------- TAGS ----------
 function findTags(text) {
   const t = text.toLowerCase();
   const rules = {
@@ -148,14 +154,12 @@ function findTags(text) {
   return found;
 }
 
-// ---------- FRESHNESS ----------
 function findLatestYear(text) {
   const matches = text.match(/\b(20\d{2})\b/g) || [];
   const years = matches.map(Number).filter(y => y >= 2015 && y <= 2026);
   return years.length ? Math.max(...years) : null;
 }
 
-// ---------- EMAIL ----------
 const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 
 const VALID_TLDS = new Set([
@@ -217,8 +221,11 @@ function scoreEmail(email, source, weight) {
   const local = email.split("@")[0].toLowerCase();
   const isGeneric = GENERIC_LOCALS.includes(local);
   if (source === "mailto") return isGeneric ? 4 : 7;
+  if (source === "cf-decoded") return isGeneric ? 4 : 7;
   if (source === "data-attr") return isGeneric ? 3 : 5;
   if (source === "json-ld") return isGeneric ? 4 : 7;
+  if (source === "footer") return isGeneric ? 4 : 6;
+  if (source === "pattern") return 2;
   if (weight >= 6) return isGeneric ? 3 : 6;
   if (weight >= 5) return isGeneric ? 2 : 4;
   return isGeneric ? 1 : 2;
@@ -236,7 +243,7 @@ function findEmails($, text, url = "", jsonLd = null) {
   function add(email, source, weight) {
     email = String(email || "").toLowerCase().trim().replace(/[.,;:!?]+$/, "");
     if (!isValidEmail(email)) return;
-    if (source !== "mailto" && source !== "data-attr" && source !== "json-ld" && firmBaseDomain) {
+    if (source !== "mailto" && source !== "data-attr" && source !== "json-ld" && source !== "pattern" && source !== "cf-decoded" && firmBaseDomain) {
       const emailDomain = email.split("@")[1];
       if (!emailDomain) return;
       const emailBase = emailDomain.split(".").slice(-2).join(".");
@@ -248,12 +255,41 @@ function findEmails($, text, url = "", jsonLd = null) {
   }
 
   if (jsonLd && jsonLd.email) add(jsonLd.email, "json-ld", 12);
+
+  const rawHtml = $.html();
+  const cfPattern = /<a[^>]*class="__cf_email__"[^>]*data-cfemail="([a-f0-9]+)"[^>]*>/gi;
+  let cfMatch;
+  while ((cfMatch = cfPattern.exec(rawHtml)) !== null) {
+    try {
+      const decoded = decodeCfEmail(cfMatch[1]);
+      if (decoded) add(decoded, "cf-decoded", 11);
+    } catch {}
+  }
+
   $('a[href^="mailto:"]').each((_, el) => {
     const href = $(el).attr("href") || "";
     const raw = href.replace(/^mailto:/i, "").split("?")[0].trim();
     add(raw, "mailto", 10);
   });
+
+  $('[data-href^="mailto:"], [data-mailto]').each((_, el) => {
+    const href = $(el).attr("data-href") || $(el).attr("data-mailto") || "";
+    const raw = href.replace(/^mailto:/i, "").split("?")[0].trim();
+    if (raw) add(raw, "mailto", 9);
+  });
+
   $("[data-email]").each((_, el) => add($(el).attr("data-email") || "", "data-attr", 8));
+
+  $("footer, .footer, #footer, .site-footer, .bottom-footer").each((_, el) => {
+    const footerText = cleanText($(el).text());
+    const footerEmails = footerText.match(EMAIL_REGEX) || [];
+    for (const m of footerEmails) add(m, "footer", 8);
+    $(el).find('a[href^="mailto:"]').each((_, mel) => {
+      const href = $(mel).attr("href") || "";
+      const raw = href.replace(/^mailto:/i, "").split("?")[0].trim();
+      add(raw, "mailto", 10);
+    });
+  });
 
   if (!isPortfolioPage) {
     const cleanBody = text.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ");
@@ -268,12 +304,32 @@ function findEmails($, text, url = "", jsonLd = null) {
     }
   }
 
+  const decodedHtml = rawHtml
+    .replace(/&#64;/g, "@").replace(/&#46;/g, ".")
+    .replace(/&#x40;/gi, "@").replace(/&#x2e;/gi, ".")
+    .replace(/&commat;/g, "@").replace(/&period;/g, ".");
+
+  const atDecoded = decodedHtml
+    .replace(/\s*\[at\]\s*/gi, "@").replace(/\s*\(at\)\s*/gi, "@").replace(/\s*\{at\}\s*/gi, "@")
+    .replace(/\s*\[dot\]\s*/gi, ".").replace(/\s*\(dot\)\s*/gi, ".").replace(/\s*\{dot\}\s*/gi, ".");
+
+  const decodedMatches = atDecoded.match(EMAIL_REGEX) || [];
+  for (const m of decodedMatches) {
+    if (m.includes("@") && isValidEmail(m)) add(m, "body", 6);
+  }
+
+  if (found.size === 0 && firmBaseDomain && !isPortfolioPage) {
+    for (const local of ["info", "contact"]) {
+      const candidate = `${local}@${firmBaseDomain}`;
+      if (!found.has(candidate)) found.set(candidate, { source: "pattern", weight: 1 });
+    }
+  }
+
   return [...found.entries()]
     .map(([email, meta]) => ({ email, source: meta.source, weight: meta.weight, score: scoreEmail(email, meta.source, meta.weight) }))
     .sort((a, b) => b.score - a.score).slice(0, 5);
 }
 
-// ---------- LINKEDIN ----------
 function findLinkedIn($, jsonLd = null) {
   const found = new Map();
   const seenPaths = new Set();
@@ -314,7 +370,6 @@ function findLinkedIn($, jsonLd = null) {
   return [...found.values()].sort((a, b) => b.score - a.score).slice(0, 10);
 }
 
-// ---------- PHONES ----------
 function findPhones(text) {
   const matches = text.match(/(?:\+?\d[\d\s().-]{7,}\d)/g);
   if (!matches) return [];
@@ -324,7 +379,6 @@ function findPhones(text) {
   })).slice(0, 2);
 }
 
-// ---------- NAME ----------
 function findName($, text) {
   const selectors = ['[itemprop="name"]',".investor-name",".person-name",".profile-name",".team-member-name"];
   for (const s of selectors) {
@@ -339,12 +393,9 @@ function findName($, text) {
   return "";
 }
 
-// ---------- COMPANY ----------
 function findCompany($, url, jsonLd = null, og = null) {
   if (jsonLd && jsonLd.name && jsonLd.name.length < 80) return jsonLd.name;
-  if (og && og.siteName && og.siteName.length < 60 && !/^(home|welcome|blog|news)$/i.test(og.siteName)) {
-    return og.siteName;
-  }
+  if (og && og.siteName && og.siteName.length < 60 && !/^(home|welcome|blog|news)$/i.test(og.siteName)) return og.siteName;
   const legal = cleanText($('[itemprop="legalName"]').first().text());
   if (legal && legal.length < 80) return legal;
   const selectors = [".company-name",".firm-name",".fund-name",".organization-name"];
@@ -373,13 +424,47 @@ function findCompany($, url, jsonLd = null, og = null) {
   return "";
 }
 
-// ---------- EXTRACT MULTIPLE PEOPLE (STRICT) ----------
+function findPortfolio(text) {
+  const companies = new Set();
+  const portfolioBlocks = text.match(/(?:portfolio|companies|investments|backed|invested in|portfolio companies)\s*[:\-–]\s*([^\n.]{10,300})/gi) || [];
+  for (const block of portfolioBlocks) {
+    const cleaned = block.replace(/^[^:]+[:\-–]\s*/, "");
+    const parts = cleaned.split(/[,;•·|]/).map(s => s.trim()).filter(Boolean);
+    for (const p of parts) {
+      const name = p.replace(/^(and|or|the|a|an)\s+/i, "").trim();
+      if (name.length >= 3 && name.length <= 40 && /^[A-Z]/.test(name) && !name.includes("@") && !name.includes("http")) {
+        companies.add(name);
+      }
+    }
+  }
+  const investedIn = text.match(/invested in\s+([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+)?)/g) || [];
+  for (const m of investedIn) {
+    const name = m.replace(/^invested in\s+/i, "").trim();
+    if (name.length >= 3 && name.length <= 40) companies.add(name);
+  }
+  return [...companies].slice(0, 10);
+}
+
+function findThesis(text) {
+  const patterns = [
+    /(?:our thesis|investment thesis|we invest in|we back|focused on|we look for|our focus is)\s*[:\-–]?\s*([^\n.]{20,250})/i,
+    /(?:thesis|focus|strategy)\s*[:\-–]\s*([^\n.]{20,250})/i
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      const thesis = cleanText(match[1]).slice(0, 250);
+      if (thesis.length >= 20) return thesis;
+    }
+  }
+  return "";
+}
+
 function extractTeamMembers($, url, base) {
   const people = [];
   const seenLinkedIn = new Set();
   const seenNames = new Set();
 
-  // 🎯 ONLY LinkedIn /in/ links with valid names
   $('a[href*="linkedin.com/in/"]').each((_, el) => {
     const href = $(el).attr("href");
     if (!href) return;
@@ -395,11 +480,8 @@ function extractTeamMembers($, url, base) {
 
       const $el = $(el);
       let name = "";
-
       const linkText = cleanText($el.text());
-      if (linkText && linkText.split(/\s+/).length >= 2 && linkText.split(/\s+/).length <= 4 && linkText.length < 60 && !/linkedin|profile|view/i.test(linkText)) {
-        name = linkText;
-      }
+      if (linkText && linkText.split(/\s+/).length >= 2 && linkText.split(/\s+/).length <= 4 && linkText.length < 60 && !/linkedin|profile|view/i.test(linkText)) name = linkText;
       if (!name) {
         const parent = $el.closest("div, li, article, section, td");
         if (parent.length) {
@@ -407,8 +489,6 @@ function extractTeamMembers($, url, base) {
           if (heading && heading.split(/\s+/).length >= 2 && heading.split(/\s+/).length <= 4 && heading.length < 60) name = heading;
         }
       }
-
-      // STRICT: must have valid name starting with capital
       if (!name) return;
       if (!/^[A-Z][a-z]+/.test(name)) return;
       if (seenNames.has(name.toLowerCase())) return;
@@ -434,33 +514,130 @@ function extractTeamMembers($, url, base) {
       const emailDetails = personEmail ? [{ email: personEmail, source: "mailto", weight: 10, score: 7 }] : [];
 
       people.push({
-        name,
-        company_name: base.company_name,
-        investor_type: base.investor_type,
-        region: base.region,
-        sectors: base.sectors,
-        tags: base.tags,
-        description: title,
-        emails: personEmail ? [personEmail] : [],
-        email_details: emailDetails,
+        name, company_name: base.company_name, investor_type: base.investor_type,
+        region: base.region, sectors: base.sectors, tags: base.tags, description: title,
+        portfolio: [], thesis: "",
+        emails: personEmail ? [personEmail] : [], email_details: emailDetails,
         email_score: emailDetails.reduce((s, e) => s + e.score, 0),
-        linkedin: [linkedinUrl],
-        linkedin_details: [{ url: linkedinUrl, score: 5 }],
-        linkedin_score: 5,
-        phones: [],
-        latest_year: base.latest_year,
-        is_fresh: base.is_fresh,
-        website: base.website,
-        source_url: url,
-        crawl_type: "team_member"
+        linkedin: [linkedinUrl], linkedin_details: [{ url: linkedinUrl, score: 5 }], linkedin_score: 5,
+        phones: [], latest_year: base.latest_year, is_fresh: base.is_fresh,
+        website: base.website, source_url: url, crawl_type: "team_member"
       });
     } catch {}
+  });
+
+  $("h2, h3, h4, .team-member, .person, .member, .team-card, .profile-card").each((_, el) => {
+    const $el = $(el);
+    const name = cleanText($el.text());
+    if (!name) return;
+    if (name.split(/\s+/).length < 2 || name.split(/\s+/).length > 4) return;
+    if (name.length > 60) return;
+    if (/^(our team|team|leadership|management|advisors|about|portfolio|investments|contact|home|board|founders|partners|staff|people)$/i.test(name)) return;
+    if (!/^[A-Z][a-z]+/.test(name)) return;
+    if (seenNames.has(name.toLowerCase())) return;
+    seenNames.add(name.toLowerCase());
+
+    const parent = $el.closest("div, li, article, section, td, .card, .profile-card, .team-card");
+    if (!parent.length) return;
+
+    let title = "";
+    const titleEl = parent.find(".title, .role, .position, .job-title, p, .designation").first().text();
+    if (titleEl) title = cleanText(titleEl).slice(0, 100);
+    if (/^(we|our|the|this|read|view|click|learn|next|previous|all|more)/i.test(title)) title = "";
+
+    let linkedinUrl = "";
+    const liEl = parent.find('a[href*="linkedin.com/in/"]').first();
+    if (liEl.length) {
+      try {
+        const parsed = new URL(liEl.attr("href"));
+        parsed.hash = ""; parsed.search = "";
+        linkedinUrl = parsed.href;
+      } catch {}
+    }
+
+    let personEmail = "";
+    const mailtoEl = parent.find('a[href^="mailto:"]').first();
+    if (mailtoEl.length) {
+      const mhref = mailtoEl.attr("href") || "";
+      const raw = mhref.replace(/^mailto:/i, "").split("?")[0].trim();
+      if (isValidEmail(raw)) personEmail = raw.toLowerCase();
+    }
+
+    const emailDetails = personEmail ? [{ email: personEmail, source: "mailto", weight: 10, score: 7 }] : [];
+
+    people.push({
+      name, company_name: base.company_name, investor_type: base.investor_type,
+      region: base.region, sectors: base.sectors, tags: base.tags, description: title,
+      portfolio: [], thesis: "",
+      emails: personEmail ? [personEmail] : [], email_details: emailDetails,
+      email_score: emailDetails.reduce((s, e) => s + e.score, 0),
+      linkedin: linkedinUrl ? [linkedinUrl] : [],
+      linkedin_details: linkedinUrl ? [{ url: linkedinUrl, score: 5 }] : [],
+      linkedin_score: linkedinUrl ? 5 : 0,
+      phones: [], latest_year: base.latest_year, is_fresh: base.is_fresh,
+      website: base.website, source_url: url, crawl_type: "team_member"
+    });
   });
 
   return people;
 }
 
-// ---------- MAIN: single ----------
+function extractPortfolioCompanies($, url) {
+  const companies = [];
+  const seen = new Set();
+  const selectors = [".portfolio-item", ".company-card", ".portfolio-card", ".startup-card", ".portfolio-company", ".investment", "article", "li.portfolio"];
+  let found = false;
+
+  for (const selector of selectors) {
+    const items = $(selector);
+    if (items.length === 0) continue;
+
+    items.each((_, el) => {
+      const $el = $(el);
+      const text = cleanText($el.text());
+      if (!text || text.length < 5 || text.length > 500) return;
+
+      let companyName = cleanText($el.find("h1, h2, h3, h4, h5, strong, .company-name, .name").first().text());
+      if (!companyName || companyName.length < 2 || companyName.length > 60) return;
+      if (seen.has(companyName.toLowerCase())) return;
+      seen.add(companyName.toLowerCase());
+
+      let founderName = "";
+      const fm = text.match(/(?:founder|co-founder|ceo)[\s:\-]*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,2})/);
+      if (fm) founderName = fm[1];
+
+      const sectors = findSectors(text);
+
+      let website = "";
+      const linkEl = $el.find('a[href^="http"]').first();
+      if (linkEl.length) {
+        const href = linkEl.attr("href");
+        if (href && !href.includes("twitter") && !href.includes("linkedin") && !href.includes("facebook")) website = href;
+      }
+
+      const linkedin = findLinkedIn($el);
+
+      companies.push({
+        name: founderName || "", company_name: companyName, investor_type: "Startup",
+        region: "", sectors, tags: ["Portfolio Company"],
+        portfolio: [companyName], thesis: "",
+        emails: [], email_details: [], email_score: 0,
+        linkedin: linkedin.map(l => l.url), linkedin_details: linkedin,
+        linkedin_score: linkedin.reduce((s, l) => s + l.score, 0),
+        phones: [], latest_year: findLatestYear(text),
+        is_fresh: (findLatestYear(text) || 0) >= 2024,
+        description: founderName ? `Founder: ${founderName}` : "",
+        website: website || url, source_url: url, crawl_type: "portfolio_company"
+      });
+      found = true;
+    });
+
+    if (found) break;
+  }
+
+  return companies.slice(0, 30);
+}
+
 function extractInvestorData($, url) {
   const text = cleanText($("body").text());
   const jsonLd = findJsonLd($);
@@ -481,6 +658,8 @@ function extractInvestorData($, url) {
   const region = findRegion(text + " " + (jsonLd.address || ""));
   const sectors = findSectors(text + " " + (jsonLd.description || "") + " " + (jsonLd.industry || ""));
   const tags = findTags(text);
+  const portfolio = findPortfolio(text);
+  const thesis = findThesis(text);
   const emailDetails = findEmails($, text, url, jsonLd);
   const linkedinDetails = findLinkedIn($, jsonLd);
   const phones = findPhones(text + " " + (jsonLd.phone || ""));
@@ -494,18 +673,16 @@ function extractInvestorData($, url) {
   const isFresh = !!(latestYear && latestYear >= 2024);
 
   return {
-    name, company_name, investor_type, region, sectors, tags,
+    name, company_name, investor_type, region, sectors, tags, portfolio, thesis,
     emails, email_details: emailDetails, email_score,
     linkedin, linkedin_details: linkedinDetails, linkedin_score,
     phones, latest_year: latestYear, is_fresh: isFresh,
     description: jsonLd.description || og.description || "",
-    website: jsonLd.url || url,
-    source_url: url,
+    website: jsonLd.url || url, source_url: url,
     crawl_type: (investor_type || sectors.length || tags.length || emails.length || linkedin.length) ? "potential_investor_page" : "general_page"
   };
 }
 
-// ---------- MAIN: multiple ----------
 function extractMultipleInvestors($, url) {
   const base = extractInvestorData($, url);
   const teamMembers = extractTeamMembers($, url, base);
@@ -513,13 +690,11 @@ function extractMultipleInvestors($, url) {
   if (teamMembers.length > 0) {
     const hasFirmData = (base.emails && base.emails.length > 0) || base.description;
     const hasCompanyOrName = base.company_name || base.name;
-    if (hasFirmData && hasCompanyOrName) {
-      return [base, ...teamMembers];
-    }
+    if (hasFirmData && hasCompanyOrName) return [base, ...teamMembers];
     return teamMembers;
   }
 
   return [base];
 }
 
-module.exports = { extractInvestorData, extractMultipleInvestors };
+module.exports = { extractInvestorData, extractMultipleInvestors, extractPortfolioCompanies };

@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1180" width="900" height="1180">
+  <rect width="900" height="1180" fill="#0f172a"/>
+  <g font-family="Consolas, Menlo, monospace" fill="#e2e8f0">
+
+    <!-- BOX 1: DISCOVERY -->
+    <rect x="80" y="40" width="740" height="100" fill="none" stroke="#e2e8f0" stroke-width="2"/>
+    <text x="450" y="70" text-anchor="middle" font-size="14" font-weight="700" letter-spacing="2" fill="#e2e8f0">DISCOVERY LAYER</text>
+    <text x="450" y="95" text-anchor="middle" font-size="13" fill="#cbd5e1">QueryParser → Seed Domains (163) → DuckDuckGo</text>
+    <text x="450" y="117" text-anchor="middle" font-size="13" fill="#cbd5e1">Source Discovery + Relevance Scoring</text>
+
+    <!-- ARROW -->
+    <text x="450" y="165" text-anchor="middle" font-size="20" fill="#e2e8f0">↓</text>
+
+    <!-- BOX 2: CRAWLING -->
+    <rect x="80" y="190" width="740" height="100" fill="none" stroke="#e2e8f0" stroke-width="2"/>
+    <text x="450" y="220" text-anchor="middle" font-size="14" font-weight="700" letter-spacing="2" fill="#e2e8f0">CRAWLING LAYER</text>
+    <text x="450" y="245" text-anchor="middle" font-size="13" fill="#cbd5e1">Static (axios) + JS-heavy (Playwright)</text>
+    <text x="450" y="267" text-anchor="middle" font-size="13" fill="#cbd5e1">Sitemap.xml + crt.sh + robots.txt respected</text>
+
+    <!-- ARROW -->
+    <text x="450" y="315" text-anchor="middle" font-size="20" fill="#e2e8f0">↓</text>
+
+    <!-- BOX 3: EXTRACTION -->
+    <rect x="80" y="340" width="740" height="100" fill="none" stroke="#e2e8f0" stroke-width="2"/>
+    <text x="450" y="370" text-anchor="middle" font-size="14" font-weight="700" letter-spacing="2" fill="#e2e8f0">EXTRACTION LAYER</text>
+    <text x="450" y="395" text-anchor="middle" font-size="13" fill="#cbd5e1">Emails + LinkedIn + Names + Sectors + Region</text>
+    <text x="450" y="417" text-anchor="middle" font-size="13" fill="#cbd5e1">Portfolio Companies + Investment Thesis</text>
+
+    <!-- ARROW -->
+    <text x="450" y="465" text-anchor="middle" font-size="20" fill="#e2e8f0">↓</text>
+
+    <!-- BOX 4: NORMALIZATION -->
+    <rect x="80" y="490" width="740" height="100" fill="none" stroke="#e2e8f0" stroke-width="2"/>
+    <text x="450" y="520" text-anchor="middle" font-size="14" font-weight="700" letter-spacing="2" fill="#e2e8f0">NORMALIZATION LAYER</text>
+    <text x="450" y="545" text-anchor="middle" font-size="13" fill="#cbd5e1">Zod Schema Validation + Field Cleaning</text>
+    <text x="450" y="567" text-anchor="middle" font-size="13" fill="#cbd5e1">Score Calculation (email / linkedin / investor)</text>
+
+    <!-- ARROW -->
+    <text x="450" y="615" text-anchor="middle" font-size="20" fill="#e2e8f0">↓</text>
+
+    <!-- BOX 5: DEDUPLICATION -->
+    <rect x="80" y="640" width="740" height="100" fill="none" stroke="#e2e8f0" stroke-width="2"/>
+    <text x="450" y="670" text-anchor="middle" font-size="14" font-weight="700" letter-spacing="2" fill="#e2e8f0">DEDUPLICATION LAYER</text>
+    <text x="450" y="695" text-anchor="middle" font-size="13" fill="#cbd5e1">Union-Find Algorithm</text>
+    <text x="450" y="717" text-anchor="middle" font-size="13" fill="#cbd5e1">LinkedIn URL → Email → Name+Company → Firm+Domain</text>
+
+    <!-- ARROW -->
+    <text x="450" y="765" text-anchor="middle" font-size="20" fill="#e2e8f0">↓</text>
+
+    <!-- BOX 6: VALIDATION -->
+    <rect x="80" y="790" width="740" height="100" fill="none" stroke="#e2e8f0" stroke-width="2"/>
+    <text x="450" y="820" text-anchor="middle" font-size="14" font-weight="700" letter-spacing="2" fill="#e2e8f0">VALIDATION LAYER</text>
+    <text x="450" y="845" text-anchor="middle" font-size="13" fill="#cbd5e1">Confidence Score (0.0 - 1.0)</text>
+    <text x="450" y="867" text-anchor="middle" font-size="13" fill="#cbd5e1">Quarantine if &lt; 0.4 OR no contact info</text>
+
+    <!-- ARROW -->
+    <text x="450" y="915" text-anchor="middle" font-size="20" fill="#e2e8f0">↓</text>
+
+    <!-- BOX 7: PERSISTENCE -->
+    <rect x="80" y="940" width="740" height="100" fill="none" stroke="#e2e8f0" stroke-width="2"/>
+    <text x="450" y="970" text-anchor="middle" font-size="14" font-weight="700" letter-spacing="2" fill="#e2e8f0">PERSISTENCE LAYER</text>
+    <text x="450" y="995" text-anchor="middle" font-size="13" fill="#cbd5e1">Supabase PostgreSQL (investors + review_queue)</text>
+    <text x="450" y="1017" text-anchor="middle" font-size="13" fill="#cbd5e1">Local JSON Backup + Search History</text>
+
+    <!-- OUTPUT BOX -->
+    <rect x="80" y="1070" width="740" height="70" fill="none" stroke="#10b981" stroke-width="2"/>
+    <text x="450" y="1098" text-anchor="middle" font-size="14" font-weight="700" letter-spacing="2" fill="#10b981">OUTPUT</text>
+    <text x="450" y="1122" text-anchor="middle" font-size="13" fill="#cbd5e1">Dashboard + CSV Export + REST API</text>
+
+  </g>
+</svg>

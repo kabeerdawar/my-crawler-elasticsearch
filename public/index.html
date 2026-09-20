@@ -11,12 +11,13 @@
   h1 { margin: 0; font-size: 32px; }
   .subtitle { color: #667085; margin-top: 8px; }
   .search-box { background: white; padding: 22px; border-radius: 14px; margin-top: 25px; box-shadow: 0 3px 12px rgba(0,0,0,0.06); }
-  .input-row { display: flex; gap: 12px; }
+  .input-row { display: flex; gap: 12px; flex-wrap: wrap; }
   input[type=text] { flex: 1; padding: 14px; border: 1px solid #ccd2dc; border-radius: 9px; font-size: 15px; }
   button { padding: 14px 24px; border: none; border-radius: 9px; background: #111827; color: white; font-weight: 600; cursor: pointer; }
   button:hover { opacity: 0.9; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   button.secondary { background: #2563eb; }
+  button.green { background: #059669; }
   .status { margin-top: 14px; font-weight: 600; color: #374151; }
   .examples { margin-top: 12px; font-size: 13px; color: #667085; }
   .examples span { display: inline-block; padding: 4px 10px; background: #eef2f7; border-radius: 12px; margin-right: 6px; margin-top: 6px; cursor: pointer; }
@@ -34,7 +35,7 @@
   .card-title { color: #667085; font-size: 14px; }
   .card-value { font-size: 30px; font-weight: bold; margin-top: 7px; }
   .filters { background: white; padding: 16px; border-radius: 14px; margin: 15px 0; display: flex; gap: 10px; flex-wrap: wrap; }
-  .filters input { max-width: 400px; }
+  .filters input { max-width: 300px; }
   select { padding: 12px; border: 1px solid #ccd2dc; border-radius: 9px; background: white; }
   .table-container { background: white; border-radius: 14px; overflow-x: auto; box-shadow: 0 3px 12px rgba(0,0,0,0.06); }
   table { width: 100%; border-collapse: collapse; min-width: 1900px; }
@@ -49,10 +50,10 @@
   .badge.yellow { background: #fef3c7; color: #92400e; }
   .badge.gray { background: #e5e7eb; color: #374151; }
   .badge.blue { background: #dbeafe; color: #1d4ed8; }
+  .badge.red { background: #fee2e2; color: #b91c1c; }
   @media (max-width: 900px) {
     .cards { grid-template-columns: repeat(2, 1fr); }
     .input-row, .filters { flex-direction: column; }
-    .filters input { max-width: none; }
   }
 </style>
 </head>
@@ -65,8 +66,9 @@
 
   <div class="search-box">
     <div class="input-row">
-      <input id="queryInput" type="text" placeholder="What investors are you looking for?" />
+      <input id="queryInput" type="text" placeholder='What investors are you looking for? e.g. "investors in Delhi"' />
       <button id="discoverBtn" onclick="discover()">Find Sources</button>
+      <button id="directUrlBtn" class="green" onclick="directCrawl()">Crawl URL Directly</button>
     </div>
     <div class="examples">
       Try:
@@ -74,6 +76,7 @@
       <span onclick="useExample('investors in San Francisco')">investors in San Francisco</span>
       <span onclick="useExample('European investors')">European investors</span>
       <span onclick="useExample('US AI seed investors')">US AI seed</span>
+      <span onclick="useExample('Indian fintech angel investors')">Indian fintech angels</span>
     </div>
     <div id="status" class="status"></div>
   </div>
@@ -106,7 +109,8 @@
     <select id="emailFilter" onchange="filterResults()">
       <option value="">All Records</option>
       <option value="has">Has Email</option>
-      <option value="strong">Strong Email (score ≥ 5)</option>
+      <option value="real">✓ Only Real Emails</option>
+      <option value="pattern">🔮 Only Pattern Emails</option>
     </select>
     <select id="confidenceFilter" onchange="filterResults()">
       <option value="">All Confidence</option>
@@ -170,13 +174,49 @@ async function discover() {
     if (!res.ok) throw new Error(data.error || "Discovery failed");
 
     discoveredSources = data.sources || [];
-    status.textContent = `Found ${discoveredSources.length} sources out of ${data.totalConsidered} considered.`;
+    status.textContent = `Found ${discoveredSources.length} sources (${data.seedMatched || 0} from seed + ${data.ddgMatched || 0} from DuckDuckGo).`;
     renderSources();
   } catch (err) {
     status.textContent = "Error: " + err.message;
   } finally {
     btn.disabled = false;
     btn.textContent = "Find Sources";
+  }
+}
+
+async function directCrawl() {
+  const input = document.getElementById("queryInput").value.trim();
+  const status = document.getElementById("status");
+
+  if (!input) { status.textContent = "Please enter a URL."; return; }
+
+  let url = input;
+  if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+
+  const btn = document.getElementById("directUrlBtn");
+  btn.disabled = true;
+  btn.textContent = "Crawling...";
+  status.textContent = `Crawling ${url} directly...`;
+
+  try {
+    const res = await fetch("/crawl", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ urls: [url], query: "" })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Crawl failed");
+
+    allResults = data.results || [];
+    status.textContent = `Done — ${data.uniqueCount} records (from ${data.rawCount} raw).`;
+    updateDashboard();
+    populateFilters();
+    filterResults();
+  } catch (err) {
+    status.textContent = "Error: " + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Crawl URL Directly";
   }
 }
 
@@ -194,7 +234,7 @@ function renderSources() {
     <div class="source-row">
       <input type="checkbox" id="src_${i}" checked />
       <span class="source-domain">${escapeHtml(s.domain)}${s.hq_city ? ` <span style="color:#667085;font-weight:400;">(${escapeHtml(s.hq_city)})</span>` : ""}</span>
-      <span class="source-meta">${escapeHtml(s.reasons.join(" • "))}</span>
+      <span class="source-meta">${escapeHtml((s.reasons || []).join(" • "))}</span>
       <span class="source-score">${s.score}</span>
     </div>
   `).join("");
@@ -220,13 +260,13 @@ async function crawlSelected() {
     const res = await fetch("/crawl", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ urls: selected })
+      body: JSON.stringify({ urls: selected, query: document.getElementById("queryInput").value.trim() })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Crawl failed");
 
     allResults = data.results || [];
-    status.textContent = `Done — ${data.uniqueCount} unique records from ${data.rawCount} raw.`;
+    status.textContent = `Done — ${data.uniqueCount} investors + ${data.reviewCount || 0} in review (from ${data.rawCount} raw).`;
 
     updateDashboard();
     populateFilters();
@@ -279,7 +319,11 @@ function filterResults() {
 
     let matchesEmail = true;
     if (emailFilter === "has") matchesEmail = r.emails && r.emails.length > 0;
-    else if (emailFilter === "strong") matchesEmail = (r.email_details || []).some(e => e.score >= 5);
+    else if (emailFilter === "real") matchesEmail = (r.email_details || []).some(e => e.source !== "pattern");
+    else if (emailFilter === "pattern") {
+      matchesEmail = (r.email_details || []).length > 0 &&
+                     (r.email_details || []).every(e => e.source === "pattern");
+    }
 
     let matchesConfidence = true;
     if (confidenceFilter === "HIGH") matchesConfidence = r.confidence === "HIGH";
@@ -311,8 +355,21 @@ function renderResults(results) {
     const emailDetails = r.email_details || [];
     const emails = emailDetails.length
       ? emailDetails.map(e => {
-          const badgeClass = e.score >= 6 ? "green" : (e.score >= 4 ? "yellow" : "gray");
-          return `<div><a href="mailto:${escapeHtml(e.email)}">${escapeHtml(e.email)}</a> <span class="badge ${badgeClass}">${e.score}/7</span></div>`;
+          let badgeClass, badgeText;
+          if (e.source === "pattern") {
+            badgeClass = "gray";
+            badgeText = "🔮 guess";
+          } else if (e.source === "mailto" || e.source === "json-ld" || e.source === "cf-decoded") {
+            badgeClass = "green";
+            badgeText = "✓ real";
+          } else if (e.source === "footer" || e.source === "body") {
+            badgeClass = "yellow";
+            badgeText = "likely";
+          } else {
+            badgeClass = "gray";
+            badgeText = (e.score || 0) + "/7";
+          }
+          return `<div><a href="mailto:${escapeHtml(e.email)}">${escapeHtml(e.email)}</a> <span class="badge ${badgeClass}">${badgeText}</span></div>`;
         }).join("")
       : (r.emails || []).map(e => `<div><a href="mailto:${e}">${escapeHtml(e)}</a></div>`).join("") || "-";
 
@@ -379,11 +436,12 @@ function downloadCSV() {
 function downloadEmailsCSV() {
   const withEmails = allResults.filter(r => r.emails && r.emails.length > 0);
   if (withEmails.length === 0) { alert("No emails found."); return; }
-  const headers = ["Company","Investor Type","Region","City","Email","Source","Score","Confidence","Source URL"];
+  const headers = ["Company","Investor Type","Region","City","Email","Type","Source","Score","Confidence","Source URL"];
   const rows = [];
   withEmails.forEach(r => {
     (r.email_details || r.emails.map(e => ({ email: e, source: "body", score: 1 }))).forEach(e => {
-      rows.push([r.company_name || "", r.investor_type || "", r.region || "", r.hq_city || "", e.email, e.source, e.score, r.confidence || "", r.source_url || ""]);
+      const type = e.source === "pattern" ? "GUESS" : "REAL";
+      rows.push([r.company_name || "", r.investor_type || "", r.region || "", r.hq_city || "", e.email, type, e.source, e.score, r.confidence || "", r.source_url || ""]);
     });
   });
   saveCSV(headers, rows, "investor-emails.csv");

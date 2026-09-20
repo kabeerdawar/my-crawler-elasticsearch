@@ -1,3 +1,15 @@
 node_modules/
 .env
-.env.localgit status
+
+# Data files
+crawl-results.json
+review-queue.json
+search-history.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db

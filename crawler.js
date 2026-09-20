@@ -3,27 +3,33 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 const fs = require("fs");
 const robotsParser = require("robots-parser");
-const { extractInvestorData, extractMultipleInvestors } = require("./extractor");
+const { extractInvestorData, extractMultipleInvestors, extractPortfolioCompanies } = require("./extractor");
 
 const maxPagesPerSite = 60;
 const userAgent = "InvestorCrawler/1.0";
 
-function cleanText(text) {
-  return String(text || "").replace(/\s+/g, " ").trim();
+// Rate limiting per domain
+const domainLastHit = new Map();
+const MIN_DELAY_MS = 500;
+
+async function rateLimit(domain) {
+  const last = domainLastHit.get(domain) || 0;
+  const elapsed = Date.now() - last;
+  if (elapsed < MIN_DELAY_MS) {
+    await new Promise(r => setTimeout(r, MIN_DELAY_MS - elapsed));
+  }
+  domainLastHit.set(domain, Date.now());
 }
 
-function cleanUrl(url) {
-  try { const p = new URL(url); p.hash = ""; return p.href; } catch { return null; }
-}
+function cleanText(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
+function cleanUrl(url) { try { const p = new URL(url); p.hash = ""; return p.href; } catch { return null; } }
 
 async function getRobots(startUrl) {
   try {
     const parsed = new URL(startUrl);
     const robotsUrl = `${parsed.protocol}//${parsed.hostname}/robots.txt`;
     const res = await axios.get(robotsUrl, {
-      timeout: 10000,
-      headers: { "User-Agent": userAgent },
-      validateStatus: () => true
+      timeout: 10000, headers: { "User-Agent": userAgent }, validateStatus: () => true
     });
     if (res.status >= 400) return null;
     return robotsParser(robotsUrl, res.data);
@@ -34,17 +40,10 @@ async function getSitemapUrls(startUrl) {
   const urls = new Set();
   try {
     const parsed = new URL(startUrl);
-    const sitemaps = [
-      `${parsed.protocol}//${parsed.hostname}/sitemap.xml`,
-      `${parsed.protocol}//${parsed.hostname}/sitemap_index.xml`
-    ];
+    const sitemaps = [`${parsed.protocol}//${parsed.hostname}/sitemap.xml`, `${parsed.protocol}//${parsed.hostname}/sitemap_index.xml`];
     for (const sitemapUrl of sitemaps) {
       try {
-        const res = await axios.get(sitemapUrl, {
-          timeout: 10000,
-          headers: { "User-Agent": userAgent },
-          validateStatus: () => true
-        });
+        const res = await axios.get(sitemapUrl, { timeout: 10000, headers: { "User-Agent": userAgent }, validateStatus: () => true });
         if (res.status !== 200) continue;
         const xml = String(res.data);
         const locMatches = xml.match(/<loc>([^<]+)<\/loc>/g) || [];
@@ -60,10 +59,14 @@ async function getSitemapUrls(startUrl) {
   return [...urls];
 }
 
-// 🎯 TEAM PAGE DETECTOR
 function isTeamPage(url) {
   const u = url.toLowerCase();
-  return /\/(team|people|our-team|leadership|partners|management|founders|about|about-us|who-we-are|investors|advisors|staff)/.test(u);
+  return /\/(team|people|our-team|our_team|leadership|leaders|partners|partner|management|founders|founder|about|about-us|about_us|who-we-are|whoweare|investors|investor|advisors|advisor|staff|principals|associates|directors|our-people|the-team|meet-the-team|network|members)/.test(u);
+}
+
+function isPortfolioPage(url) {
+  const u = url.toLowerCase();
+  return /\/(portfolio|companies|investments|backed|our-companies|funded|startups)/.test(u);
 }
 
 function getInvestorScore(url, text = "") {
@@ -87,8 +90,7 @@ function isJunkPage(url, text) {
 
 async function crawlSite(startUrl, allRecords) {
   let startDomain;
-  try { startDomain = new URL(startUrl).hostname; }
-  catch { return; }
+  try { startDomain = new URL(startUrl).hostname; } catch { return; }
 
   let robots = await getRobots(startUrl);
   if (!robots) robots = { isAllowed: () => true };
@@ -101,9 +103,11 @@ async function crawlSite(startUrl, allRecords) {
   try {
     const sitemapUrls = await getSitemapUrls(startUrl);
     if (sitemapUrls.length > 0) {
-      const teamPages = sitemapUrls.filter(u => isTeamPage(u));
-      queue.push(...teamPages.slice(0, 30));
-      console.log(`  Sitemap: ${sitemapUrls.length} URLs, ${teamPages.length} team pages added`);
+      const interesting = sitemapUrls.filter(u =>
+        /\/(contact|contact-us|impressum|get-in-touch|team|about|people|portfolio|companies|investments|partners|leadership|founders|principals|advisors|network|members)/i.test(u)
+      );
+      queue.push(...interesting.slice(0, 40));
+      console.log(`  Sitemap: ${sitemapUrls.length} URLs, ${interesting.length} relevant added`);
     }
   } catch {}
 
@@ -111,40 +115,33 @@ async function crawlSite(startUrl, allRecords) {
     const url = queue.shift();
     if (!url || visited.has(url)) continue;
     if (!robots.isAllowed(url, userAgent)) continue;
-
     visited.add(url);
 
     try {
-      const res = await axios.get(url, {
-        timeout: 10000,
-        headers: { "User-Agent": userAgent },
-        maxContentLength: 5 * 1024 * 1024
-      });
-
+      await rateLimit(startDomain);
+      const res = await axios.get(url, { timeout: 10000, headers: { "User-Agent": userAgent }, maxContentLength: 5 * 1024 * 1024 });
       const $ = cheerio.load(res.data);
       const text = cleanText($("body").text());
-
       if (isJunkPage(url, text)) continue;
 
       const score = getInvestorScore(url, text);
-
-      if (score >= 3) {
+      if (score >= 2) {
         let records;
-        if (isTeamPage(url)) {
+        if (isPortfolioPage(url) && !isTeamPage(url)) {
+          records = extractPortfolioCompanies($, url);
+          if (records.length === 0) records = [extractInvestorData($, url)];
+        } else if (isTeamPage(url)) {
           records = extractMultipleInvestors($, url);
         } else {
-          const single = extractInvestorData($, url);
-          records = [single];
+          records = [extractInvestorData($, url)];
         }
 
         let kept = 0;
         for (const record of records) {
           const hasName = record.name && record.name.length > 2;
           const hasCompany = record.company_name && record.company_name.length > 2;
-          const hasEmail = record.emails && record.emails.length > 0;
-          const hasLinkedIn = record.linkedin && record.linkedin.length > 0;
-
-          if ((hasName || hasCompany) && (hasEmail || hasLinkedIn)) {
+          const hasContact = (record.emails && record.emails.length > 0) || (record.linkedin && record.linkedin.length > 0);
+          if ((hasName && hasContact) || (hasCompany && !hasName)) {
             record.investor_score = score;
             record.status_code = res.status;
             allRecords.push(record);
@@ -167,19 +164,14 @@ async function crawlSite(startUrl, allRecords) {
           }
         } catch {}
       });
-    } catch (err) {
-      console.log(`  Failed ${url}: ${err.message}`);
-    }
+    } catch (err) { console.log(`  Failed ${url}: ${err.message}`); }
   }
   console.log(`Done ${startDomain} — pages: ${visited.size}`);
 }
 
 async function crawlSites(urls) {
   const allRecords = [];
-  for (const url of urls) {
-    try { await crawlSite(url, allRecords); }
-    catch (err) { console.log(`Site failed: ${url}`); }
-  }
+  for (const url of urls) { try { await crawlSite(url, allRecords); } catch { console.log(`Site failed: ${url}`); } }
   return allRecords;
 }
 
@@ -187,9 +179,8 @@ if (require.main === module) {
   const cliUrl = process.argv[2];
   let seeds;
   if (cliUrl) seeds = [cliUrl.trim()];
-  else if (fs.existsSync("seeds.txt")) {
-    seeds = fs.readFileSync("seeds.txt", "utf8").split(/\r?\n/).map(u => u.trim()).filter(u => u && !u.startsWith("#"));
-  } else { console.log("No URL."); process.exit(1); }
+  else if (fs.existsSync("seeds.txt")) seeds = fs.readFileSync("seeds.txt", "utf8").split(/\r?\n/).map(u => u.trim()).filter(u => u && !u.startsWith("#"));
+  else { console.log("No URL."); process.exit(1); }
   crawlSites(seeds).then(records => {
     fs.writeFileSync("crawl-results.json", JSON.stringify(records, null, 2));
     console.log(`\nTotal: ${records.length}`);

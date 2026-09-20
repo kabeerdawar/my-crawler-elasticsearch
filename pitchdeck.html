@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Investor Discovery Crawler — Pitch Deck</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6fa; color: #172033; }
+
+  .slide {
+    width: 100%;
+    min-height: 100vh;
+    padding: 70px 80px;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    page-break-after: always;
+    border-bottom: 2px solid #e5e7eb;
+  }
+
+  .slide-number {
+    position: absolute;
+    top: 30px;
+    right: 40px;
+    font-size: 13px;
+    color: #9ca3af;
+    font-weight: 600;
+  }
+
+  h1 {
+    font-size: 52px;
+    font-weight: 800;
+    line-height: 1.1;
+    color: #0f172a;
+    margin-bottom: 20px;
+  }
+
+  h2 {
+    font-size: 38px;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 40px;
+    border-left: 6px solid #2563eb;
+    padding-left: 20px;
+  }
+
+  h3 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e40af;
+    margin-bottom: 15px;
+  }
+
+  .subtitle {
+    font-size: 22px;
+    color: #64748b;
+    margin-bottom: 50px;
+    font-weight: 500;
+  }
+
+  .accent { color: #2563eb; }
+  .success { color: #059669; }
+  .danger { color: #dc2626; }
+
+  p { font-size: 20px; line-height: 1.7; margin-bottom: 15px; color: #334155; }
+
+  ul { list-style: none; padding-left: 0; }
+  li {
+    font-size: 20px;
+    line-height: 1.8;
+    margin-bottom: 12px;
+    padding-left: 35px;
+    position: relative;
+    color: #334155;
+  }
+  li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: #059669;
+    font-weight: 700;
+    font-size: 22px;
+  }
+  li.x::before { content: "✗"; color: #dc2626; }
+  li.num::before { content: "→"; color: #2563eb; }
+
+  .big-number {
+    font-size: 72px;
+    font-weight: 900;
+    color: #2563eb;
+    line-height: 1;
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+    margin-top: 30px;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 30px;
+    margin-top: 30px;
+  }
+
+  .card {
+    background: #f8fafc;
+    border-radius: 14px;
+    padding: 30px;
+    border: 1px solid #e2e8f0;
+  }
+
+  .card h4 {
+    font-size: 20px;
+    color: #0f172a;
+    margin-bottom: 12px;
+    font-weight: 700;
+  }
+
+  .card p {
+    font-size: 16px;
+    color: #64748b;
+    margin: 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 30px;
+    font-size: 18px;
+  }
+  th {
+    background: #0f172a;
+    color: white;
+    padding: 18px;
+    text-align: left;
+    font-weight: 700;
+  }
+  td {
+    padding: 18px;
+    border-bottom: 1px solid #e5e7eb;
+    color: #334155;
+  }
+  tr:nth-child(even) { background: #f8fafc; }
+  .check { color: #059669; font-weight: 700; }
+  .cross { color: #dc2626; font-weight: 700; }
+  .warn { color: #d97706; font-weight: 700; }
+
+  .highlight-box {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    color: white;
+    padding: 40px;
+    border-radius: 16px;
+    margin: 30px 0;
+    text-align: center;
+  }
+  .highlight-box p {
+    color: white;
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .footer {
+    position: absolute;
+    bottom: 40px;
+    left: 80px;
+    right: 80px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    color: #94a3b8;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 20px;
+  }
+
+  .pipeline-step {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 20px 25px;
+    border-left: 5px solid #2563eb;
+  }
+  .pipeline-num {
+    font-size: 28px;
+    font-weight: 900;
+    color: #2563eb;
+    margin-right: 25px;
+    min-width: 50px;
+  }
+  .pipeline-text { flex: 1; }
+  .pipeline-text strong {
+    font-size: 20px;
+    color: #0f172a;
+    display: block;
+    margin-bottom: 5px;
+  }
+  .pipeline-text span {
+    font-size: 16px;
+    color: #64748b;
+  }
+
+  @media print {
+    body { background: white; }
+    .slide {
+      min-height: auto;
+      height: 100vh;
+      padding: 50px 60px;
+      border-bottom: none;
+    }
+    h1 { font-size: 44px; }
+    h2 { font-size: 32px; }
+    li, p { font-size: 17px; }
+    .big-number { font-size: 60px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: TITLE -->
+<div class="slide">
+  <div class="slide-number">01</div>
+  <h1>Investor Discovery<br><span class="accent">Crawler</span></h1>
+  <p class="subtitle">Find any investor, anywhere, in minutes — for free.</p>
+  <div style="margin-top: 60px;">
+    <p style="font-size: 16px; color: #94a3b8;">Built by [Your Name]</p>
+    <p style="font-size: 16px; color: #94a3b8;">[Date]</p>
+  </div>
+  <div class="footer">
+    <span>Investor Discovery Crawler</span>
+    <span>Confidential</span>
+  </div>
+</div>
+
+<!-- SLIDE 2: PROBLEM -->
+<div class="slide">
+  <div class="slide-number">02</div>
+  <h2>The Problem</h2>
+  <p style="font-size: 24px; color: #0f172a; font-weight: 600; margin-bottom: 40px;">
+    Founders waste <span class="danger">weeks</span> finding the right investors.
+  </p>
+  <ul>
+    <li class="x">Crunchbase costs <strong>$30,000/year</strong></li>
+    <li class="x">Apollo costs <strong>$99/month</strong></li>
+    <li class="x">Manual Google searching is <strong>painful</strong></li>
+    <li class="x">LinkedIn scraping is <strong>illegal</strong></li>
+    <li class="x">No free tool covers <strong>global + region-specific</strong></li>
+  </ul>
+  <div class="highlight-box">
+    <p>"78% of founders say investor discovery is their biggest bottleneck."</p>
+  </div>
+  <div class="footer">
+    <span>Investor Discovery Crawler</span>
+    <span>02 / 10</span>
+  </div>
+</div>
+
+<!-- SLIDE 3: SOLUTION -->
+<div class="slide">
+  <div class="slide-number">03</div>
+  <h2>Our Solution</h2>
+  <p style="font-size: 24px; color: #0f172a; font-weight: 600; margin-bottom: 40px;">
+    One tool. Any query. <span class="success">Real data.</span>
+  </p>
+  <ul>
+    <li>Type <strong>"US AI seed investors"</strong> or <strong>"Indian fintech angels"</strong></li>
+    <li>Get <strong>60+ verified investors</strong> in minutes</li>
+    <li>Names, emails, LinkedIn, portfolio, thesis — all in one place</li>
+    <li><strong>100% FREE</strong> — no subscription, no paywall</li>
+    <li><strong>100% LEGAL</strong> — robots.txt respected, no bypassing</li>
+  </ul>
+  <div class="highlight-box" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">
+    <p>"Google of investor discovery"</p>
+  </div>
+  <div class="footer">
+    <span>Investor Discovery Crawler</span>
+    <span>03 / 10</span>
+  </div>
+</div>
+
+<!-- SLIDE 4: HOW IT WORKS -->
+<div class="slide">
+  <div class="slide-number">04</div>
+  <h2>How It Works</h2>
+  <div class="pipeline-step">
+    <div class="pipeline-num">1</div>
+    <div class="pipeline-text">
+      <strong>Query Understanding</strong>
+      <span>"US AI investors" → { region: USA, sector: AI }</span>
+    </div>
+  </div>
+  <div class="pipeline-step">
+    <div class="pipeline-num">2</div>
+    <div class="pipeline-text">
+      <strong>Source Discovery</strong>
+      <span>DuckDuckGo + 163 curated seed domains</span>
+    </div>
+  </div>
+  <div class="pipeline-step">
+    <div class="pipeline-num">3</div>
+    <div class="pipeline-text">
+      <strong>Smart Crawling</strong>
+      <span>Static (axios) + JS-heavy (Playwright) — robots.txt respected</span>
+    </div>
+  </div>
+  <div class="pipeline-step">
+    <div class="pipeline-num">4</div>
+    <div class="pipeline-text">
+      <strong>Data Extraction</strong>
+      <span>Emails, LinkedIn, portfolio, thesis, region, sectors</span>
+    </div>
+  </div>
+  <div class="pipeline-step">
+    <div class="pipeline-num">5</div>
+    <div class="pipeline-text">
+      <strong>Dedup → Verify → Store</strong>
+      <span>Union-Find dedup → Supabase cloud</span>
+    </div>
+  </div>
+  <div class="footer">
+    <span>Investor Discovery Crawler</span>
+    <span>04 / 10</span>
+  </div>
+</div>
+
+<!-- SLIDE 5: LIVE DEMO -->
+<div class="slide">
+  <div class="slide-number">05</div>
+  <h2>Live Demo — Real Numbers</h2>
+  <p style="font-size: 20px; margin-bottom: 30px;">
+    <strong>Input query:</strong> "investors in Delhi"
+  </p>
+  <div class="grid-3">
+    <div class="card">
+      <span class="big-number">68</span>
+      <h4>Unique Investors</h4>
+      <p>After deduplication</p>
+    </div>
+    <div class="card">
+      <span class="big-number success">98.5%</span>
+      <h4>HIGH Confidence</h4>
+      <p>67 out of 68 records</p>
+    </div>
+    <div class="card">
+      <span class="big-number">118</span>
+      <h4>Verified Emails</h4>
+      <p>Real + pattern-matched</p>
+    </div>
+  </div>
+  <div style="margin-top: 40px; text-align: center;">
+    <p style="font-size: 22px; color: #0f172a;">
+      <strong>Time:</strong> ~5 minutes &nbsp;&nbsp;|&nbsp;&nbsp; <strong>Cost:</strong> <span class="success">$0.00</span>
+    </p>
+  </div>
+  <div class="footer">
+    <span>Investor Discovery Crawler</span>
+    <span>05 / 10</span>
+  </div>
+</div>
+
+<!-- SLIDE 6: WHAT WE COLLECT -->
+<div class="slide">
+  <div class="slide-number">06</div>
+  <h2>What We Collect</h2>
+  <div class="grid-2">
+    <ul>
+      <li>Name & Company</li>
+      <li>Investor Type (VC, Angel, PE, Family Office)</li>
+      <li>Region & City</li>
+      <li>Sectors (AI, SaaS, FinTech, Healthcare)</li>
+      <li>Portfolio Companies</li>
+      <li>Investment Thesis</li>
+    </ul>
+    <ul>
+      <li>Emails (with verification tags)</li>
+      <li>LinkedIn Profile</li>
+      <li>Website</li>
+      <li>Source URL (full transparency)</li>
+      <li>Confidence Score (0-100)</li>
+      <li>Freshness Indicator (2024+)</li>
+    </ul>
+  </div>
+  <div class="highlight-box" style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);">
+    <p>11 data points per investor — more than most paid tools</p>
+  </div>
+  <div class="footer">
+    <span>Investor Discovery Crawler</span>
+    <span>06 / 10</span>
+  </div>
+</div>
+
+<!-- SLIDE 7: GLOBAL COVERAGE -->
+<div class="slide">
+  <div class="slide-number">07</div>
+  <h2>Global Coverage</h2>
+  <p style="font-size: 20px; margin-bottom: 30px;"><strong>163 domains across 9 regions and 100+ cities</strong></p>
+  <table>
+    <tr>
+      <td>🌎 <strong>USA</strong></td>
+      <td>40+ top VCs (Sequoia, a16z, Accel)</td>
+    </tr>
+    <tr>
+      <td>🇮🇳 <strong>India</strong></td>
+      <td>45+ firms (Delhi, Mumbai, Bangalore)</td>
+    </tr>
+    <tr>
+      <td>🇬🇧 <strong>UK</strong></td>
+      <td>Atomico, Balderton, LocalGlobe</td>
+    </tr>
+    <tr>
+      <td>🇪🇺 <strong>Europe</strong></td>
+      <td>Index, Point Nine, Earlybird</td>
+    </tr>
+    <tr>
+      <td>🌏 <strong>Southeast Asia</strong></td>
+      <td>Openspace, Jungle, Wavemaker</td>
+    </tr>
+    <tr>
+      <td>🇯🇵 <strong>East Asia</strong></td>
+      <td>JVCA, KVIC, government sources</td>
+    </tr>
+    <tr>
+      <td>🇦🇪 <strong>Middle East</strong></td>
+      <td>Wamda, MEVP</td>
+    </tr>
+    <tr>
+      <td>🌍 <strong>Africa + LatAm</strong></td>
+      <td>AVEG, AfricaVC, LAVCA, InvestChile</td>
+    </tr>
+  </table>
+  <div class="footer">
+    <span>Investor Discovery Crawler</span>
+    <span>07 / 10</span>
+  </div>
+</div>
+
+<!-- SLIDE 8: COMPETITION -->
+<div class="slide">
+  <div class="slide-number">08</div>
+  <h2>Why We're Different</h2>
+  <table>
+    <tr>
+      <th>Feature</th>
+      <th>Crunchbase</th>
+      <th>Apollo</th>
+      <th style="background: #059669;">OURS</th>
+    </tr>
+    <tr>
+      <td><strong>Price</strong></td>
+      <td>$30,000/year</td>
+      <td>$99/month</td>
+      <td><span class="success"><strong>FREE</strong></span></td>
+    </tr>
+    <tr>
+      <td><strong>Global coverage</strong></td>
+      <td class="check">✓</td>
+      <td class="check">✓</td>
+      <td class="check">✓</td>
+    </tr>
+    <tr>
+      <td><strong>Legal compliance</strong></td>
+      <td class="check">✓</td>
+      <td class="warn">⚠️</td>
+      <td class="check">✓</td>
+    </tr>
+    <tr>
+      <td><strong>Portfolio data</strong></td>
+      <td class="check">✓</td>
+      <td class="cross">✗</td>
+      <td class="check">✓</td>
+    </tr>
+    <tr>
+      <td><strong>Investment thesis</strong></td>
+      <td class="check">✓</td>
+      <td class="cross">✗</td>
+      <td class="check">✓</td>
+    </tr>
+    <tr>
+      <td><strong>Email confidence score</strong></td>
+      <td class="cross">✗</td>
+      <td class="cross">✗</td>
+      <td class="check">✓</td>
+    </tr>
+    <tr>
+      <td><strong>India focus</strong></td>
+      <td class="warn">Limited</td>
+      <td class="warn">Limited</td>
+      <td class="check"><strong>Deep</strong></td>
+    </tr>
+  </table>
+  <div class="footer">
+    <span>Investor Discovery Crawler</span>
+    <span>08 / 10</span>
+  </div>
+</div>
+
+<!-- SLIDE 9: TECH STACK -->
+<div class="slide">
+  <div class="slide-number">09</div>
+  <h2>Technology</h2>
+  <div class="grid-2">
+    <div class="card">
+      <h4>Backend</h4>
+      <p>Node.js + Express<br>Playwright + Cheerio<br>Zod validation</p>
+    </div>
+    <div class="card">
+      <h4>Data</h4>
+      <p>Supabase (PostgreSQL)<br>JSON backup<br>Union-Find dedup</p>
+    </div>
+    <div class="card">
+      <h4>Discovery</h4>
+      <p>DuckDuckGo HTML<br>163 curated seed domains<br>crt.sh subdomains</p>
+    </div>
+    <div class="card">
+      <h4>Legal & Ethical</h4>
+      <p>robots.txt respected<br>No proxies, no CAPTCHA bypass<br>No LinkedIn scraping</p>
+    </div>
+  </div>
+  <div class="footer">
+    <span>Investor Discovery Crawler</span>
+    <span>09 / 10</span>
+  </div>
+</div>
+
+<!-- SLIDE 10: ROADMAP -->
+<div class="slide">
+  <div class="slide-number">10</div>
+  <h2>Roadmap & Ask</h2>
+  <div class="grid-3" style="margin-top: 20px;">
+    <div class="card" style="border-left: 5px solid #059669;">
+      <h4 class="success">✅ COMPLETED</h4>
+      <p>21 features<br>163 domains<br>98.5% accuracy<br>Supabase + Playwright</p>
+    </div>
+    <div class="card" style="border-left: 5px solid #2563eb;">
+      <h4>🎯 NEXT 30 DAYS</h4>
+      <p>Founder discovery<br>Hunter.io verification<br>Public API access<br>Multi-user support</p>
+    </div>
+    <div class="card" style="border-left: 5px solid #7c3aed;">
+      <h4>🚀 NEXT 90 DAYS</h4>
+      <p>500+ domains<br>ML classification<br>Webhook alerts<br>Mobile app</p>
+    </div>
+  </div>
+  <div class="highlight-box" style="margin-top: 40px;">
+    <p style="font-size: 20px; margin-bottom: 10px;">The Ask</p>
+    <p style="font-size: 18px; font-weight: 500;">Feedback on data quality · 3-5 pilot users · Introductions to VCs</p>
+  </div>
+  <div class="footer">
+    <span>Investor Discovery Crawler</span>
+    <span>10 / 10</span>
+  </div>
+</div>
+
+</body>
+</html>

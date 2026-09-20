@@ -10,9 +10,14 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@supabase/supabase-js": "^2.109.0",
     "axios": "^1.20.0",
     "cheerio": "^1.2.0",
+    "dotenv": "^18.0.1",
     "express": "^5.2.1",
-    "robots-parser": "^3.0.1"
+    "playwright": "^1.63.0",
+    "robots-parser": "^3.0.1",
+    "ws": "^8.21.3",
+    "zod": "^4.6.5"
   }
 }

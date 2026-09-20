@@ -4,20 +4,9 @@ const path = require("path");
 
 const SEED_PATH = path.join(__dirname, "data", "seed-domains.json");
 
-// High-authority sources that should always rank higher
 const HIGH_AUTHORITY = [
-  "startupindia.gov.in",
-  "sebi.gov.in",
-  "startupsforall.in",
-  "ynos.in",
-  "data.gov.in",
-  "msme.gov.in",
-  "nvca.org",
-  "vcdir.com",
-  "investorhunt.co",
-  "openvc.app",
-  "signal.nfx.com",
-  "northdata.com"
+  "startupindia.gov.in","sebi.gov.in","startupsforall.in","ynos.in","data.gov.in","msme.gov.in",
+  "nvca.org","vcdir.com","investorhunt.co","openvc.app","signal.nfx.com","northdata.com"
 ];
 
 function loadSeedDomains() {
@@ -36,75 +25,45 @@ function scoreSeed(seed, query) {
   let score = 0;
   const reasons = [];
 
-  // ----- CITY (STRICT) -----
   if (query.city) {
     const seedHq = (seed.hq_city || "").toLowerCase();
     const qCity = query.city.toLowerCase();
-
-    if (seedHq !== qCity) {
-      return { score: -999, reasons: [`not in ${query.city}`] };
-    }
-
+    if (seedHq !== qCity) return { score: -999, reasons: [`not in ${query.city}`] };
     score += 6;
     reasons.push(`hq=${query.city}`);
   }
 
-  // ----- REGION -----
   if (query.region) {
-    if (seed.region === query.region) {
-      score += 5;
-      reasons.push(`region=${seed.region}`);
-    } else if (seed.region === "Global") {
-      score += 2;
-      reasons.push("region=Global");
-    } else {
-      score -= 3;
-    }
+    if (seed.region === query.region) { score += 5; reasons.push(`region=${seed.region}`); }
+    else if (seed.region === "Global") { score += 2; reasons.push("region=Global"); }
+    else { score -= 3; }
   }
 
-  // ----- SECTORS -----
   if (query.sectors && query.sectors.length) {
     const overlap = (seed.sectors || []).filter(s => query.sectors.includes(s));
-    if (overlap.length) {
-      score += 3 * overlap.length;
-      reasons.push(`sectors=${overlap.join(",")}`);
-    }
+    if (overlap.length) { score += 3 * overlap.length; reasons.push(`sectors=${overlap.join(",")}`); }
   }
 
-  // ----- STAGES -----
   if (query.stages && query.stages.length) {
     const overlap = (seed.stages || []).filter(s => query.stages.includes(s));
-    if (overlap.length) {
-      score += 2 * overlap.length;
-      reasons.push(`stages=${overlap.join(",")}`);
-    }
+    if (overlap.length) { score += 2 * overlap.length; reasons.push(`stages=${overlap.join(",")}`); }
   }
 
-  // ----- INVESTOR TYPE -----
   if (query.investorTypes && query.investorTypes.length) {
-    if (query.investorTypes.includes(seed.type)) {
-      score += 2;
-      reasons.push(`type=${seed.type}`);
-    }
+    if (query.investorTypes.includes(seed.type)) { score += 2; reasons.push(`type=${seed.type}`); }
   }
 
-  // ----- HIGH-AUTHORITY BONUS -----
-  if (HIGH_AUTHORITY.includes(seed.domain)) {
-    score += 4;
-    reasons.push("high-authority source");
-  }
+  if (HIGH_AUTHORITY.includes(seed.domain)) { score += 4; reasons.push("high-authority source"); }
 
   return { score, reasons };
 }
 
 function discoverSources(query, options = {}) {
   const minScore = options.minScore ?? 1;
-  const maxSources = options.maxSources ?? 150;
+  const maxSources = options.maxSources ?? 100;
 
   const seeds = loadSeedDomains();
-  if (seeds.length === 0) {
-    return { query, sources: [], message: "No seed domains loaded." };
-  }
+  if (seeds.length === 0) return { query, sources: [], message: "No seed domains loaded." };
 
   const scored = seeds.map(seed => {
     const { score, reasons } = scoreSeed(seed, query);
