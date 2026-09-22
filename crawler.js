@@ -1,4 +1,3 @@
-// crawler.js
 const axios = require("axios");
 const cheerio = require("cheerio");
 const fs = require("fs");
@@ -8,6 +7,36 @@ const ai = require("./ai-helper");
 
 const maxPagesPerSite = 60;
 const userAgent = "InvestorCrawler/1.0";
+
+// 🚫 JUNK DOMAIN BLACKLIST — directory, media, trade bodies
+const DOMAIN_BLACKLIST = [
+  // Trade bodies / Industry associations
+  "nasscom.in", "cii.in", "ficci.com", "assocham.org", "phdcci.in",
+  "ibef.org", "investindia.gov.in",
+
+  // Media / News / Blogs
+  "inc42.com", "yourstory.com", "techcrunch.com", "entrackr.com",
+  "economictimes.indiatimes.com", "livemint.com", "business-standard.com",
+  "moneycontrol.com", "vccircle.com", "medianama.com",
+  "forbes.com", "forbesindia.com", "bloomberg.com", "reuters.com",
+  "cnbc.com", "cnbctv18.com", "businessinsider.in", "businesstoday.in",
+
+  // Directories / Social / Wikipedia
+  "linkedin.com", "twitter.com", "x.com", "facebook.com", "instagram.com",
+  "youtube.com", "wikipedia.org", "medium.com", "reddit.com", "quora.com",
+  "glassdoor.com", "indeed.com", "naukri.com",
+  "crunchbase.com", "pitchbook.com", "tracxn.com",
+
+  // Government / Generic
+  "gov.in", "nic.in"
+];
+
+function isBlacklisted(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    return DOMAIN_BLACKLIST.some(d => host === d || host.endsWith("." + d));
+  } catch { return false; }
+}
 
 // Rate limiting per domain
 const domainLastHit = new Map();
@@ -94,146 +123,142 @@ function isJunkPage(url, text) {
   return false;
 }
 
-// --- FIX: Added a top-level try...catch wrapper for the entire site crawl ---
 async function crawlSite(startUrl, allRecords) {
+  // 🚫 Blacklist check
+  if (isBlacklisted(startUrl)) {
+    console.log(`  ⏭️  Skipped (blacklisted): ${startUrl}`);
+    return;
+  }
+
+  let startDomain;
+  try { startDomain = new URL(startUrl).hostname; } catch { return; }
+
+  let robots = await getRobots(startUrl);
+  if (!robots) robots = { isAllowed: () => true };
+  if (!robots.isAllowed(startUrl, userAgent)) { console.log(`Blocked: ${startUrl}`); return; }
+
+  const visited = new Set();
+  const queue = [startUrl];
+  console.log(`Starting: ${startUrl}`);
+
   try {
-    let startDomain;
-    try { startDomain = new URL(startUrl).hostname; } catch { return; }
+    const sitemapUrls = await getSitemapUrls(startUrl);
+    if (sitemapUrls.length > 0) {
+      const interesting = sitemapUrls.filter(u =>
+        /\/(contact|contact-us|impressum|get-in-touch|team|about|people|portfolio|companies|investments|partners|leadership|founders|principals|advisors|network|members)/i.test(u)
+      );
+      queue.push(...interesting.slice(0, 40));
+      console.log(`  Sitemap: ${sitemapUrls.length} URLs, ${interesting.length} relevant added`);
+    }
+  } catch {}
 
-    let robots = await getRobots(startUrl);
-    if (!robots) robots = { isAllowed: () => true };
-    if (!robots.isAllowed(startUrl, userAgent)) { console.log(`Blocked: ${startUrl}`); return; }
+  while (queue.length > 0 && visited.size < maxPagesPerSite) {
+    const url = queue.shift();
+    if (!url || visited.has(url)) continue;
 
-    const visited = new Set();
-    const queue = [startUrl];
-    console.log(`Starting: ${startUrl}`);
+    // 🚫 Blacklist check for every discovered URL too
+    if (isBlacklisted(url)) continue;
+    if (!robots.isAllowed(url, userAgent)) continue;
+
+    visited.add(url);
 
     try {
-      const sitemapUrls = await getSitemapUrls(startUrl);
-      if (sitemapUrls.length > 0) {
-        const interesting = sitemapUrls.filter(u =>
-          /\/(contact|contact-us|impressum|get-in-touch|team|about|people|portfolio|companies|investments|partners|leadership|founders|principals|advisors|network|members)/i.test(u)
-        );
-        queue.push(...interesting.slice(0, 40));
-        console.log(`  Sitemap: ${sitemapUrls.length} URLs, ${interesting.length} relevant added`);
-      }
-    } catch {}
+      await rateLimit(startDomain);
+      const res = await axios.get(url, { timeout: 30000, headers: { "User-Agent": userAgent }, maxContentLength: 5 * 1024 * 1024 });
+      const $ = cheerio.load(res.data);
+      const text = cleanText($("body").text());
+      if (isJunkPage(url, text)) continue;
 
-    while (queue.length > 0 && visited.size < maxPagesPerSite) {
-      const url = queue.shift();
-      if (!url || visited.has(url)) continue;
-      if (!robots.isAllowed(url, userAgent)) continue;
-      visited.add(url);
-
-      try {
-        await rateLimit(startDomain);
-        const res = await axios.get(url, { timeout: 30000, headers: { "User-Agent": userAgent }, maxContentLength: 5 * 1024 * 1024 });
-        const $ = cheerio.load(res.data);
-        const text = cleanText($("body").text());
-        if (isJunkPage(url, text)) continue;
-
-        const score = getInvestorScore(url, text);
-        if (score >= 2) {
-          let records;
-          if (isPortfolioPage(url) && !isTeamPage(url)) {
-            records = extractPortfolioCompanies($, url);
-            if (records.length === 0) records = [extractInvestorData($, url)];
-          } else if (isTeamPage(url)) {
-            records = extractMultipleInvestors($, url);
-          } else {
-            records = [extractInvestorData($, url)];
-          }
-
-          // 🎯 GEMINI AI EXTRACTION — if regex found nothing useful
-          const hasUsefulData = records.some(r =>
-            (r.emails && r.emails.length > 0) || (r.linkedin && r.linkedin.length > 0)
-          );
-
-          if (!hasUsefulData && text.length > 500 && ai.aiStatus().gemini) {
-            try {
-              console.log(`  🤖 Gemini extracting: ${url}`);
-              const aiRecord = await ai.aiExtractInvestor(text, url);
-              if (aiRecord && (aiRecord.name || aiRecord.company_name || (aiRecord.emails && aiRecord.emails.length))) {
-                records = [{
-                  name: aiRecord.name || "",
-                  company_name: aiRecord.company_name || "",
-                  investor_type: aiRecord.investor_type || "",
-                  region: aiRecord.region || "",
-                  hq_city: aiRecord.hq_city || null,
-                  sectors: aiRecord.sectors || [],
-                  tags: aiRecord.tags || [],
-                  portfolio: aiRecord.portfolio || [],
-                  thesis: aiRecord.thesis || "",
-                  emails: aiRecord.emails || [],
-                  email_details: (aiRecord.emails || []).map(e => ({ email: e, source: "gemini", weight: 8, score: 6 })),
-                  email_score: 6,
-                  linkedin: aiRecord.linkedin || [],
-                  linkedin_details: (aiRecord.linkedin || []).map(u => ({ url: u, score: 5 })),
-                  linkedin_score: 5,
-                  phones: [],
-                  latest_year: null,
-                  is_fresh: false,
-                  description: aiRecord.description || "",
-                  website: url,
-                  source_url: url,
-                  investor_score: score,
-                  crawl_type: "gemini_extracted"
-                }];
-                console.log(`  ✅ Gemini extracted: ${aiRecord.company_name || aiRecord.name || "record"}`);
-              }
-            } catch (err) {
-              console.log(`  Gemini extraction failed: ${err.message}`);
-            }
-          }
-
-          let kept = 0;
-          for (const record of records) {
-            const hasName = record.name && record.name.length > 2;
-            const hasCompany = record.company_name && record.company_name.length > 2;
-            const hasContact = (record.emails && record.emails.length > 0) || (record.linkedin && record.linkedin.length > 0);
-            if ((hasName && hasContact) || (hasCompany && !hasName)) {
-              record.investor_score = score;
-              record.status_code = res.status;
-              allRecords.push(record);
-              kept++;
-            }
-          }
-          if (kept > 0) console.log(`  KEPT (${kept}): ${url}`);
+      const score = getInvestorScore(url, text);
+      if (score >= 2) {
+        let records;
+        if (isPortfolioPage(url) && !isTeamPage(url)) {
+          records = extractPortfolioCompanies($, url);
+          if (records.length === 0) records = [extractInvestorData($, url)];
+        } else if (isTeamPage(url)) {
+          records = extractMultipleInvestors($, url);
+        } else {
+          records = [extractInvestorData($, url)];
         }
 
-        $("a").each((_, el) => {
-          const href = $(el).attr("href");
-          if (!href) return;
+        // 🎯 GEMINI AI EXTRACTION — if regex found nothing useful
+        const hasUsefulData = records.some(r =>
+          (r.emails && r.emails.length > 0) || (r.linkedin && r.linkedin.length > 0)
+        );
+
+        if (!hasUsefulData && text.length > 500 && ai.aiStatus().gemini) {
           try {
-            const abs = new URL(href, url);
-            if (abs.protocol !== "http:" && abs.protocol !== "https:") return;
-            if (abs.hostname !== startDomain) return;
-            const clean = cleanUrl(abs.href);
-            if (clean && !visited.has(clean) && !queue.includes(clean)) {
-              if (robots.isAllowed(clean, userAgent)) queue.push(clean);
+            console.log(`  🤖 Gemini extracting: ${url}`);
+            const aiRecord = await ai.aiExtractInvestor(text, url);
+            if (aiRecord && (aiRecord.name || aiRecord.company_name || (aiRecord.emails && aiRecord.emails.length))) {
+              records = [{
+                name: aiRecord.name || "",
+                company_name: aiRecord.company_name || "",
+                investor_type: aiRecord.investor_type || "",
+                region: aiRecord.region || "",
+                hq_city: aiRecord.hq_city || null,
+                sectors: aiRecord.sectors || [],
+                tags: aiRecord.tags || [],
+                portfolio: aiRecord.portfolio || [],
+                thesis: aiRecord.thesis || "",
+                emails: aiRecord.emails || [],
+                email_details: (aiRecord.emails || []).map(e => ({ email: e, source: "gemini", weight: 8, score: 6 })),
+                email_score: 6,
+                linkedin: aiRecord.linkedin || [],
+                linkedin_details: (aiRecord.linkedin || []).map(u => ({ url: u, score: 5 })),
+                linkedin_score: 5,
+                phones: [],
+                latest_year: null,
+                is_fresh: false,
+                description: aiRecord.description || "",
+                website: url,
+                source_url: url,
+                investor_score: score,
+                crawl_type: "gemini_extracted"
+              }];
+              console.log(`  ✅ Gemini extracted: ${aiRecord.company_name || aiRecord.name || "record"}`);
             }
-          } catch {}
-        });
-      } catch (err) { 
-        console.log(`  Failed ${url}: ${err.message}`); 
+          } catch (err) {
+            console.log(`  Gemini extraction failed: ${err.message}`);
+          }
+        }
+
+        let kept = 0;
+        for (const record of records) {
+          const hasName = record.name && record.name.length > 2;
+          const hasCompany = record.company_name && record.company_name.length > 2;
+          const hasContact = (record.emails && record.emails.length > 0) || (record.linkedin && record.linkedin.length > 0);
+          if ((hasName && hasContact) || (hasCompany && !hasName)) {
+            record.investor_score = score;
+            record.status_code = res.status;
+            allRecords.push(record);
+            kept++;
+          }
+        }
+        if (kept > 0) console.log(`  KEPT (${kept}): ${url}`);
       }
-    }
-    console.log(`Done ${startDomain} — pages: ${visited.size}`);
-  } catch (error) {
-    // --- FIX: Agar koi unexpected error aata hai toh pura server crash na ho ---
-    console.error(`Fatal error crawling ${startUrl}:`, error.message);
+
+      $("a").each((_, el) => {
+        const href = $(el).attr("href");
+        if (!href) return;
+        try {
+          const abs = new URL(href, url);
+          if (abs.protocol !== "http:" && abs.protocol !== "https:") return;
+          if (abs.hostname !== startDomain) return;
+          const clean = cleanUrl(abs.href);
+          if (clean && !visited.has(clean) && !queue.includes(clean)) {
+            if (!isBlacklisted(clean) && robots.isAllowed(clean, userAgent)) queue.push(clean);
+          }
+        } catch {}
+      });
+    } catch (err) { console.log(`  Failed ${url}: ${err.message}`); }
   }
+  console.log(`Done ${startDomain} — pages: ${visited.size}`);
 }
 
 async function crawlSites(urls) {
   const allRecords = [];
-  for (const url of urls) { 
-    try { 
-      await crawlSite(url, allRecords); 
-    } catch { 
-      console.log(`Site failed: ${url}`); 
-    } 
-  }
+  for (const url of urls) { try { await crawlSite(url, allRecords); } catch { console.log(`Site failed: ${url}`); } }
   return allRecords;
 }
 

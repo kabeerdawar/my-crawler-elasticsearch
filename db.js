@@ -1,226 +1,205 @@
 // db.js
-require("dotenv").config();
-const ws = require("ws");
-global.WebSocket = ws;
-
 const { createClient } = require("@supabase/supabase-js");
-
-const URL = process.env.SUPABASE_URL;
-const KEY = process.env.SUPABASE_SERVICE_KEY;
+const ws = require("ws");
 
 let supabase = null;
-if (URL && KEY) {
-  supabase = createClient(URL, KEY);
-  console.log("✅ Supabase initialized");
-} else {
-  console.log("⚠️  Supabase keys missing");
+let configured = false;
+
+function init() {
+  try {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_ANON_KEY
+             || process.env.SUPABASE_ANON
+             || process.env.SUPABASE_PUBLISHABLE_KEY
+             || process.env.SUPABASE_PUBLISHABLE
+             || process.env.SUPABASE_KEY;
+
+    if (!url || !key) {
+      console.log("⚠️  Supabase not configured");
+      configured = false;
+      return;
+    }
+
+    supabase = createClient(url, key, {
+      auth: { persistSession: false },
+      realtime: { transport: ws }
+    });
+    configured = true;
+    console.log("✅ Supabase client initialized");
+  } catch (err) {
+    console.error("❌ Supabase init failed:", err.message);
+    configured = false;
+  }
 }
 
-function cleanForDB(r) {
+init();
+
+function isConfigured() {
+  return configured && supabase !== null;
+}
+
+// 🎯 CHANGE: mapRecord with crawl_query
+function mapRecord(r) {
   return {
-    name: r.name || null,
-    company_name: r.company_name || null,
-    investor_type: r.investor_type || null,
-    region: r.region || null,
+    name: r.name || "",
+    company_name: r.company_name || "",
+    investor_type: r.investor_type || "",
+    region: r.region || "",
     hq_city: r.hq_city || null,
     sectors: r.sectors || [],
     tags: r.tags || [],
     portfolio: r.portfolio || [],
-    thesis: r.thesis || null,
+    thesis: r.thesis || "",
     emails: r.emails || [],
     email_details: r.email_details || [],
-    email_score: r.email_score || 0,
+    email_score: r.email_score ?? 0,
     linkedin: r.linkedin || [],
     linkedin_details: r.linkedin_details || [],
-    linkedin_score: r.linkedin_score || 0,
+    linkedin_score: r.linkedin_score ?? 0,
     phones: r.phones || [],
-    latest_year: r.latest_year || null,
-    is_fresh: r.is_fresh || false,
-    description: r.description || null,
-    website: r.website || null,
-    source_url: r.source_url || null,
-    investor_score: r.investor_score || 0,
-    confidence: r.confidence || null,
-    confidence_score: r.confidence_score || 0,
-    source_count: r.source_count || 1,
-    all_sources: r.all_sources || [],
-    last_verified_at: r.last_verified_at || new Date().toISOString()
+    latest_year: r.latest_year ?? null,
+    is_fresh: r.is_fresh ?? false,
+    description: r.description || "",
+    website: r.website || "",
+    source_url: r.source_url || "",
+    investor_score: r.investor_score ?? 0,
+    confidence: r.confidence || "",
+    status_code: r.status_code ?? null,
+    crawl_type: r.crawl_type || "",
+    crawl_query: r.crawl_query || ""   // 🎯 YEH SAVE HO RAHA HAI
   };
 }
 
-// 🎯 INTELLIGENT SAVE: Insert new + update existing (session-based)
-async function saveInvestors(records, sessionId) {
-  if (!supabase || !records || records.length === 0) {
-    return { saved: 0, newCount: 0, updatedCount: 0, newRecords: [] };
+async function saveInvestors(investors) {
+  if (!isConfigured()) {
+    return { saved: 0, skipped: investors.length, error: "Supabase not configured" };
+  }
+  if (!Array.isArray(investors) || investors.length === 0) {
+    return { saved: 0, skipped: 0 };
   }
 
+  const rows = investors.map(mapRecord);
+
   try {
-    const urls = records.map(r => r.source_url).filter(Boolean);
-    if (urls.length === 0) return { saved: 0, newCount: 0, updatedCount: 0, newRecords: [] };
-
-    // 1. Find which source_urls already exist in DB
-    const { data: existing, error: fetchErr } = await supabase
-      .from("investors")
-      .select("source_url")
-      .in("source_url", urls);
-
-    if (fetchErr) console.error("Fetch existing error:", fetchErr.message);
-
-    const existingUrls = new Set((existing || []).map(e => e.source_url));
-
-    // 2. Split records
-    const newRecords = records.filter(r => r.source_url && !existingUrls.has(r.source_url));
-    const existingRecords = records.filter(r => r.source_url && existingUrls.has(r.source_url));
-
-    console.log(`📊 Save split: ${newRecords.length} new, ${existingRecords.length} existing`);
-
-    // 3. Insert NEW records with session ID
-    if (newRecords.length > 0) {
-      const toInsert = newRecords.map(r => ({
-        ...cleanForDB(r),
-        crawl_session: sessionId,
-        first_seen_at: new Date().toISOString(),
-        last_seen_at: new Date().toISOString()
-      }));
-
-      const { error } = await supabase.from("investors").insert(toInsert);
-      if (error) console.error("Insert new error:", error.message);
-    }
-
-    // 4. Update EXISTING records
-    if (existingRecords.length > 0) {
-      for (const r of existingRecords) {
-        const updated = {
-          ...cleanForDB(r),
-          last_seen_at: new Date().toISOString()
-        };
-
-        const { error } = await supabase
-          .from("investors")
-          .update(updated)
-          .eq("source_url", r.source_url);
-
-        if (error) console.error("Update error:", error.message);
+    const CHUNK_SIZE = 100;
+    let saved = 0;
+    for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+      const chunk = rows.slice(i, i + CHUNK_SIZE);
+      const { data, error } = await supabase
+        .from("investors")
+        .insert(chunk)
+        .select("id");
+      if (error) {
+        console.error("  Insert failed:", error.message);
+        continue;
       }
+      saved += data?.length || 0;
     }
-
-    return {
-      saved: records.length,
-      newCount: newRecords.length,
-      updatedCount: existingRecords.length,
-      newRecords,
-      allRecords: records
-    };
+    return { saved, skipped: rows.length - saved };
   } catch (err) {
-    console.error("Save exception:", err.message);
-    return { saved: 0, newCount: 0, updatedCount: 0, newRecords: [], error: err.message };
+    console.error("saveInvestors error:", err.message);
+    return { saved: 0, skipped: rows.length, error: err.message };
   }
 }
 
-async function saveReviewQueue(records, sessionId) {
-  if (!supabase || !records || records.length === 0) {
-    return { saved: 0, newCount: 0 };
+async function saveReviewQueue(reviewQueue) {
+  if (!isConfigured()) {
+    return { saved: 0, skipped: reviewQueue.length, error: "Supabase not configured" };
   }
+  if (!Array.isArray(reviewQueue) || reviewQueue.length === 0) {
+    return { saved: 0, skipped: 0 };
+  }
+
+  const rows = reviewQueue.map(r => ({
+    ...mapRecord(r),
+    review_reason: r.review_reason || ""
+  }));
 
   try {
-    const urls = records.map(r => r.source_url).filter(Boolean);
-    if (urls.length === 0) return { saved: 0, newCount: 0 };
-
-    const { data: existing } = await supabase
-      .from("review_queue")
-      .select("source_url")
-      .in("source_url", urls);
-
-    const existingUrls = new Set((existing || []).map(e => e.source_url));
-    const newRecords = records.filter(r => r.source_url && !existingUrls.has(r.source_url));
-
-    if (newRecords.length > 0) {
-      const toInsert = newRecords.map(r => ({
-        ...cleanForDB(r),
-        quarantine_reason: r.quarantine_reason || "unknown",
-        crawl_session: sessionId,
-        first_seen_at: new Date().toISOString(),
-        last_seen_at: new Date().toISOString()
-      }));
-
-      const { error } = await supabase.from("review_queue").insert(toInsert);
-      if (error) console.error("Review insert error:", error.message);
+    const CHUNK_SIZE = 100;
+    let saved = 0;
+    for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+      const chunk = rows.slice(i, i + CHUNK_SIZE);
+      const { data, error } = await supabase
+        .from("review_queue")
+        .insert(chunk)
+        .select("id");
+      if (error) {
+        console.error("  review_queue insert failed:", error.message);
+        continue;
+      }
+      saved += data?.length || 0;
     }
-
-    return { saved: newRecords.length, newCount: newRecords.length };
+    return { saved, skipped: rows.length - saved };
   } catch (err) {
-    return { saved: 0, newCount: 0 };
+    console.error("saveReviewQueue error:", err.message);
+    return { saved: 0, skipped: rows.length, error: err.message };
   }
 }
 
-// 🎯 Get NEW records from latest session
-async function getLatestSessionRecords() {
-  if (!supabase) return [];
-  try {
-    const { data: latestSession } = await supabase
-      .from("investors")
-      .select("crawl_session")
-      .order("first_seen_at", { ascending: false })
-      .limit(1);
-
-    if (!latestSession || latestSession.length === 0) return [];
-
-    const sessionId = latestSession[0].crawl_session;
-    if (!sessionId) return [];
-
-    const { data, error } = await supabase
-      .from("investors")
-      .select("*")
-      .eq("crawl_session", sessionId)
-      .order("confidence_score", { ascending: false });
-
-    if (error) return [];
-    return data || [];
-  } catch { return []; }
-}
-
-// Get ALL records
 async function getAllInvestors() {
-  if (!supabase) return [];
+  if (!isConfigured()) return [];
   try {
     const { data, error } = await supabase
       .from("investors")
       .select("*")
-      .order("first_seen_at", { ascending: false })
-      .limit(5000);
-
-    if (error) return [];
+      .order("investor_score", { ascending: false })
+      .limit(10000);
+    if (error) {
+      console.error("getAllInvestors error:", error.message);
+      return [];
+    }
     return data || [];
-  } catch { return []; }
-}
-
-function generateSessionId() {
-  return `crawl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-// 🎯 RESET EVERYTHING (use carefully)
-async function resetAll() {
-  if (!supabase) return { investors: 0, review: 0, error: "Supabase not configured" };
-  try {
-    const { count: invCount } = await supabase.from("investors").select("*", { count: "exact", head: true });
-    const { count: revCount } = await supabase.from("review_queue").select("*", { count: "exact", head: true });
-
-    await supabase.from("investors").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    await supabase.from("review_queue").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-
-    return { investors: invCount || 0, review: revCount || 0 };
   } catch (err) {
-    return { investors: 0, review: 0, error: err.message };
+    console.error("getAllInvestors error:", err.message);
+    return [];
+  }
+}
+
+async function getInvestorsByQuery(query) {
+  if (!isConfigured()) return [];
+  try {
+    const { data, error } = await supabase
+      .from("investors")
+      .select("*")
+      .eq("crawl_query", query)
+      .order("investor_score", { ascending: false })
+      .limit(1000);
+    if (error) {
+      console.error("getInvestorsByQuery error:", error.message);
+      return [];
+    }
+    return data || [];
+  } catch (err) {
+    console.error("getInvestorsByQuery error:", err.message);
+    return [];
+  }
+}
+
+async function deleteAllInvestors() {
+  if (!isConfigured()) return { deleted: 0 };
+  try {
+    const { data, error } = await supabase
+      .from("investors")
+      .delete()
+      .neq("id", 0)
+      .select("id");
+    if (error) {
+      console.error("deleteAllInvestors error:", error.message);
+      return { deleted: 0, error: error.message };
+    }
+    return { deleted: data?.length || 0 };
+  } catch (err) {
+    console.error("deleteAllInvestors error:", err.message);
+    return { deleted: 0, error: err.message };
   }
 }
 
 module.exports = {
-  supabase,
   saveInvestors,
   saveReviewQueue,
   getAllInvestors,
-  getLatestSessionRecords,
-  generateSessionId,
-  resetAll,
-  isConfigured: () => !!supabase
+  getInvestorsByQuery,
+  deleteAllInvestors,
+  isConfigured
 };

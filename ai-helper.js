@@ -40,7 +40,7 @@ async function geminiExtract(prompt) {
   if (!GEMINI_KEY) return null;
   try {
     const res = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
       {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {

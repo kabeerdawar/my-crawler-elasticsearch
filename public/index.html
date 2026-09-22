@@ -93,7 +93,7 @@
           <input type="checkbox" id="viewToggle" onchange="onToggleChange()">
           <span class="slider"></span>
         </label>
-        <span id="labelAll" class="toggle-label">📚 All Records</span>
+        <span id="labelAll" class="toggle-label">🔍 This Search</span>
       </div>
       <button class="reset-btn" onclick="resetCrawler()" id="resetBtn" title="Clears crawler tracker and history — data stays safe">🔄 Reset Crawler</button>
     </div>
@@ -179,23 +179,21 @@
 
 <script>
 // ============================================================
-// 🛡️ FIX: Safe Fetch Wrapper to prevent "Unexpected token '<'" crash
+// 🛡️ SAFE FETCH — prevents JSON parse errors on HTML responses
 // ============================================================
 async function safeFetch(url, options = {}) {
     try {
         const response = await fetch(url, options);
         const contentType = response.headers.get("content-type");
         
-        // Agar server ne JSON nahi bheja (e.g., crash hone pe HTML bheja)
         if (!contentType || !contentType.includes("application/json")) {
             const text = await response.text();
-            console.error("Server ne HTML bheja JSON ke bajaye. Yeh raha woh:", text);
-            throw new Error(`Server Error (${response.status}). Console check kar.`);
+            console.error("Server returned HTML instead of JSON:", text);
+            throw new Error(`Server Error (${response.status}). Check console.`);
         }
 
         const data = await response.json();
         
-        // Agar HTTP status 400/500 hai toh error throw karo
         if (!response.ok) {
             throw new Error(data.error || `HTTP error! status: ${response.status}`);
         }
@@ -203,7 +201,7 @@ async function safeFetch(url, options = {}) {
         return data;
     } catch (error) {
         console.error("SafeFetch Error:", error);
-        throw error; // Caller ke catch block mein handle hoga
+        throw error;
     }
 }
 
@@ -254,7 +252,6 @@ async function reloadCurrentView() {
       filterResults();
       return;
     }
-
     allResults = newRecordsThisSession;
     status.textContent = `Showing ${allResults.length} new records from this session's crawl`;
     updateDashboard();
@@ -263,13 +260,27 @@ async function reloadCurrentView() {
     return;
   }
 
-  // All Records view
-  status.textContent = "Loading all records...";
+  // 🎯 "This Search" view — current query ke records filter karo
+  const currentQuery = document.getElementById("queryInput").value.trim();
+  status.textContent = currentQuery 
+    ? `Loading records for "${currentQuery}"...` 
+    : "Loading records...";
+
   try {
-    const data = await safeFetch("/results/all"); // 🛡️ FIXED
+    const url = currentQuery 
+      ? `/results/all?query=${encodeURIComponent(currentQuery)}`
+      : "/results/all";
+    
+    const data = await safeFetch(url);
     allResults = data.results || [];
     lastCrawlStats = { newCount: 0, updatedCount: 0 };
-    status.textContent = `Showing ${allResults.length} total records from all crawls`;
+    
+    if (currentQuery) {
+      status.textContent = `Showing ${allResults.length} records matching "${currentQuery}"`;
+    } else {
+      status.textContent = `Showing ${allResults.length} total records (no filter)`;
+    }
+    
     updateDashboard();
     populateFilters();
     filterResults();
@@ -299,13 +310,11 @@ async function resetCrawler() {
   status.textContent = "Clearing crawler state...";
 
   try {
-    const data = await safeFetch("/reset", { method: "POST" }); // 🛡️ FIXED
-
+    const data = await safeFetch("/reset", { method: "POST" });
     newRecordsThisSession = [];
     hasCrawledThisSession = false;
-
     status.textContent =
-      `✅ Crawler reset — data preserved (${data.dataPreserved.investors} investors + ${data.dataPreserved.review} review still safe). Next crawl will show ALL records.`;
+      `✅ Crawler reset — data preserved (${data.dataPreserved.investors} investors + ${data.dataPreserved.review} review still safe).`;
   } catch (err) {
     status.textContent = "Error: " + err.message;
   } finally {
@@ -318,7 +327,6 @@ async function discover() {
   const query = document.getElementById("queryInput").value.trim();
   const btn = document.getElementById("discoverBtn");
   const status = document.getElementById("status");
-
   if (!query) { status.textContent = "Please enter a query."; return; }
 
   btn.disabled = true;
@@ -326,7 +334,7 @@ async function discover() {
   status.textContent = "Parsing query and finding sources...";
 
   try {
-    const data = await safeFetch("/discover", { // 🛡️ FIXED
+    const data = await safeFetch("/discover", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query })
@@ -357,10 +365,10 @@ async function directCrawl() {
   status.textContent = `Crawling ${url} directly...`;
 
   try {
-    const data = await safeFetch("/crawl", { // 🛡️ FIXED
+    const data = await safeFetch("/crawl", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ urls: [url], query: "" })
+      body: JSON.stringify({ urls: [url], query: document.getElementById("queryInput").value.trim() })
     });
 
     hasCrawledThisSession = true;
@@ -369,18 +377,10 @@ async function directCrawl() {
     lastCrawlStats = { newCount: data.newCount || 0, updatedCount: data.updatedCount || 0 };
     status.textContent = `Done — 🆕 ${data.newCount} new + ♻️ ${data.updatedCount} updated`;
 
-    if (data.wasReset) {
-      document.getElementById("viewToggle").checked = true;
-      currentView = "all";
-      document.getElementById("labelNew").classList.remove("active");
-      document.getElementById("labelAll").classList.add("active");
-      status.textContent += ` | 📚 Total: ${data.totalCount}`;
-    } else {
-      document.getElementById("viewToggle").checked = false;
-      currentView = "new";
-      document.getElementById("labelNew").classList.add("active");
-      document.getElementById("labelAll").classList.remove("active");
-    }
+    document.getElementById("viewToggle").checked = false;
+    currentView = "new";
+    document.getElementById("labelNew").classList.add("active");
+    document.getElementById("labelAll").classList.remove("active");
 
     updateDashboard();
     populateFilters();
@@ -430,7 +430,7 @@ async function crawlSelected(force = false) {
   status.textContent = `Crawling ${selected.length} sources${force ? " (force mode)" : ""}. Please wait...`;
 
   try {
-    const data = await safeFetch("/crawl", { // 🛡️ FIXED
+    const data = await safeFetch("/crawl", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -452,18 +452,10 @@ async function crawlSelected(force = false) {
       status.textContent = `Done — 🆕 ${data.newCount} NEW + ♻️ ${data.updatedCount} updated${totalMsg}`;
     }
 
-    if (data.wasReset) {
-      document.getElementById("viewToggle").checked = true;
-      currentView = "all";
-      document.getElementById("labelNew").classList.remove("active");
-      document.getElementById("labelAll").classList.add("active");
-      status.textContent += " — showing ALL records (reset detected)";
-    } else {
-      document.getElementById("viewToggle").checked = false;
-      currentView = "new";
-      document.getElementById("labelNew").classList.add("active");
-      document.getElementById("labelAll").classList.remove("active");
-    }
+    document.getElementById("viewToggle").checked = false;
+    currentView = "new";
+    document.getElementById("labelNew").classList.add("active");
+    document.getElementById("labelAll").classList.remove("active");
 
     updateDashboard();
     populateFilters();
@@ -601,14 +593,14 @@ function renderResults(results) {
 
 function downloadCSV() {
   if (allResults.length === 0) { alert("No results."); return; }
-  const headers = ["Name","Company","Investor Type","Region","City","Sectors","Tags","Emails","Email Score","LinkedIn","LinkedIn Score","Confidence","Fresh","Latest Year","Investor Score","Source"];
+  const headers = ["Name","Company","Investor Type","Region","City","Sectors","Tags","Emails","Email Score","LinkedIn","LinkedIn Score","Confidence","Fresh","Latest Year","Investor Score","Source","Crawl Query"];
   const rows = allResults.map(r => [
     r.name || "", r.company_name || "", r.investor_type || "", r.region || "", r.hq_city || "",
     (r.sectors || []).join("; "), (r.tags || []).join("; "),
     (r.emails || []).join("; "), r.email_score ?? 0,
     (r.linkedin || []).join("; "), r.linkedin_score ?? 0,
     r.confidence || "", r.is_fresh ? "yes" : "no", r.latest_year || "",
-    r.investor_score ?? "", r.source_url || ""
+    r.investor_score ?? "", r.source_url || "", r.crawl_query || ""
   ]);
   saveCSV(headers, rows, "investor-results.csv");
 }
@@ -616,12 +608,12 @@ function downloadCSV() {
 function downloadEmailsCSV() {
   const withEmails = allResults.filter(r => r.emails && r.emails.length > 0);
   if (withEmails.length === 0) { alert("No emails."); return; }
-  const headers = ["Company","Investor Type","Region","City","Email","Verification","Source","Confidence","Source URL"];
+  const headers = ["Company","Investor Type","Region","City","Email","Verification","Source","Confidence","Source URL","Crawl Query"];
   const rows = [];
   withEmails.forEach(r => {
     (r.email_details || r.emails.map(e => ({ email: e, source: "body" }))).forEach(e => {
       const verification = e.verified === true ? "VERIFIED" : e.verified === false ? "INVALID" : e.source === "pattern" ? "GUESS" : "UNVERIFIED";
-      rows.push([r.company_name || "", r.investor_type || "", r.region || "", r.hq_city || "", e.email, verification, e.source, r.confidence || "", r.source_url || ""]);
+      rows.push([r.company_name || "", r.investor_type || "", r.region || "", r.hq_city || "", e.email, verification, e.source, r.confidence || "", r.source_url || "", r.crawl_query || ""]);
     });
   });
   saveCSV(headers, rows, "investor-emails.csv");

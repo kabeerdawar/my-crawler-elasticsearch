@@ -1,7 +1,8 @@
 // server.js
+require('dotenv').config();
+
 console.log('🚀 server.js starting...');
 
-// --- FIX: Global Crash Protection (Sabse upar hona chahiye) ---
 process.on('uncaughtException', (err) => {
     console.error('UNCAUGHT EXCEPTION! 💥 Server zinda hai...');
     console.error(err.name, err.message);
@@ -11,7 +12,6 @@ process.on('unhandledRejection', (err) => {
     console.error('UNHANDLED REJECTION! 💥 Server zinda hai...');
     console.error(err.name, err.message);
 });
-// -----------------------------------------------------------
 
 const express = require("express");
 const fs = require("fs");
@@ -33,7 +33,6 @@ console.log('📦 All modules loaded');
 const app = express();
 const PORT = 3000;
 
-// ---------- SEARCH HISTORY ----------
 const HISTORY_FILE = path.join(__dirname, "search-history.json");
 
 function loadHistory() {
@@ -177,6 +176,16 @@ async function crawlUrls(cleanUrls, query) {
   console.log(`Investors: ${investors.length}, Review: ${reviewQueue.length}`);
   console.log(`HIGH: ${investors.filter(r => r.confidence === "HIGH").length}`);
 
+  // 🎯 CHANGE 1: Har record mein crawl_query save karo
+  const cleanQuery = String(query || "").trim();
+  for (const record of investors) {
+    record.crawl_query = cleanQuery;
+  }
+  for (const record of reviewQueue) {
+    record.crawl_query = cleanQuery;
+  }
+  console.log(`🏷️  Tagged ${investors.length} investors with query: "${cleanQuery}"`);
+
   const seeds = loadSeedDomains();
   for (const record of investors) {
     try {
@@ -218,7 +227,6 @@ async function crawlUrls(cleanUrls, query) {
   return { rawRecords, valid, invalidCount, investors, reviewQueue };
 }
 
-// Wire scheduler
 scheduler.setCrawler(async (urls, query) => {
   const cleanUrls = urls.map(u => String(u || "").trim()).filter(u => /^https?:\/\//i.test(u));
   if (cleanUrls.length === 0) return;
@@ -265,35 +273,48 @@ app.get("/results", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ---------- GET /results/all (FIXED: Added for frontend toggle) ----------
+// ---------- GET /results/all (FILTERED BY QUERY) ----------
 app.get("/results/all", async (req, res) => {
   try {
+    const queryFilter = String(req.query.query || "").trim().toLowerCase();
+
+    let data = [];
     if (isConfigured()) {
-      const data = await getAllInvestors();
-      return res.json({ count: data.length, results: data, source: "supabase" });
+      data = await getAllInvestors();
+    } else {
+      const p = path.join(__dirname, "crawl-results.json");
+      if (!fs.existsSync(p)) return res.json({ count: 0, results: [] });
+      data = JSON.parse(fs.readFileSync(p, "utf8"));
     }
-    const p = path.join(__dirname, "crawl-results.json");
-    if (!fs.existsSync(p)) return res.json({ count: 0, results: [] });
-    const data = JSON.parse(fs.readFileSync(p, "utf8"));
-    res.json({ count: data.length, results: data, source: "json" });
+
+    console.log(`🔍 /results/all filter="${queryFilter}" total_in_db=${data.length}`);
+
+    // 🎯 CHANGE 2: Filter logic
+    if (queryFilter) {
+      data = data.filter(r => {
+        const rq = String(r.crawl_query || "").toLowerCase().trim();
+        if (!rq) return false;
+        return rq === queryFilter || rq.includes(queryFilter) || queryFilter.includes(rq);
+      });
+      console.log(`   → matched ${data.length} records`);
+    }
+
+    res.json({ count: data.length, results: data, source: isConfigured() ? "supabase" : "json" });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ---------- POST /reset (FIXED: Added for frontend reset button) ----------
+// ---------- POST /reset ----------
 app.post("/reset", async (req, res) => {
   try {
-    // 1. Clear search history
     if (fs.existsSync(HISTORY_FILE)) {
       fs.writeFileSync(HISTORY_FILE, JSON.stringify([], null, 2));
     }
 
-    // 2. Clear crawler tracker file if it exists
     const trackerPath = path.join(__dirname, "crawl-tracker.json");
     if (fs.existsSync(trackerPath)) {
       fs.writeFileSync(trackerPath, JSON.stringify({}, null, 2));
     }
 
-    // 3. Count preserved data (do NOT delete)
     let investorCount = 0;
     let reviewCount = 0;
 
@@ -317,10 +338,7 @@ app.post("/reset", async (req, res) => {
     res.json({
       success: true,
       message: "Crawler reset successfully",
-      dataPreserved: {
-        investors: investorCount,
-        review: reviewCount
-      }
+      dataPreserved: { investors: investorCount, review: reviewCount }
     });
   } catch (err) {
     console.error("Reset error:", err);
