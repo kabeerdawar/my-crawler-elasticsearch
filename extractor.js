@@ -1,700 +1,354 @@
 // extractor.js
+// 🎯 Real emails + pattern generation + strict filtering
+
+const { buildPatternEmails, detectPatternFromExisting } = require("./email-patterns");
 
 function cleanText(text) {
   return String(text || "").replace(/\s+/g, " ").trim();
 }
 
-function unique(values) {
-  return [...new Set(values.map(v => cleanText(v)).filter(Boolean))];
+function unique(arr) {
+  return [...new Set(arr.filter(Boolean))];
 }
 
-function decodeCfEmail(hex) {
-  try {
-    const key = parseInt(hex.slice(0, 2), 16);
-    let email = "";
-    for (let i = 2; i < hex.length; i += 2) {
-      email += String.fromCharCode(parseInt(hex.substr(i, 2), 16) ^ key);
-    }
-    return email;
-  } catch { return null; }
-}
-
-// ---------- JSON-LD ----------
-function findJsonLd($) {
-  const result = { name: "", description: "", url: "", email: "", phone: "", address: "", industry: "", founders: [], social: {} };
-  $('script[type="application/ld+json"]').each((_, el) => {
-    try {
-      let json = $(el).html();
-      if (!json) return;
-      json = JSON.parse(json);
-      const items = Array.isArray(json) ? json : [json];
-      for (const item of items) {
-        const type = item["@type"];
-        if (!type) continue;
-        if (/Organization|Corporation|LocalBusiness|FinancialService/.test(type)) {
-          if (item.name && !result.name) result.name = item.name;
-          if (item.description && !result.description) result.description = item.description;
-          if (item.url && !result.url) result.url = item.url;
-          if (item.email && !result.email) result.email = item.email;
-          if (item.telephone && !result.phone) result.phone = item.telephone;
-          if (item.industry && !result.industry) result.industry = item.industry;
-          if (item.address && !result.address) {
-            const a = item.address;
-            result.address = [a.streetAddress, a.addressLocality, a.addressRegion, a.addressCountry].filter(Boolean).join(", ");
-          }
-          if (item.founder) {
-            const fs = Array.isArray(item.founder) ? item.founder : [item.founder];
-            for (const f of fs) {
-              if (typeof f === "string") result.founders.push(f);
-              else if (f.name) result.founders.push(f.name);
-            }
-          }
-          if (item.sameAs) {
-            const links = Array.isArray(item.sameAs) ? item.sameAs : [item.sameAs];
-            for (const link of links) {
-              if (/linkedin\.com/i.test(link)) result.social.linkedin = link;
-            }
-          }
-        }
-      }
-    } catch {}
-  });
-  return result;
-}
-
-function findOpenGraph($) {
-  const getMeta = (prop) => cleanText(
-    $(`meta[property="${prop}"]`).attr("content") ||
-    $(`meta[name="${prop}"]`).attr("content") || ""
-  );
-  return { siteName: getMeta("og:site_name"), title: getMeta("og:title"), description: getMeta("og:description"), url: getMeta("og:url") };
-}
-
-function findInvestorType(text) {
-  const t = text.toLowerCase();
-  if (/family office|family fund|family investment office/.test(t)) return "Family Fund";
-  if (/private equity|private-equity/.test(t)) return "Private Equity";
-  if (/venture capital|venture fund|vc firm|vc fund/.test(t)) return "Venture Capital";
-  if (/angel investor|angel investing|angel network/.test(t)) return "Angel Investor";
-  if (/\bhni\b|high-net-worth individual|high net worth individual/.test(t)) return "HNI";
-  return "";
-}
-
-function findRegion(text) {
-  const t = text.toLowerCase();
-  const regions = {
-    India: ["india","mumbai","delhi","new delhi","bangalore","bengaluru","hyderabad","chennai","pune","gurugram","gurgaon","ahmedabad","kolkata"],
-    USA: ["united states","usa","new york","san francisco","california","boston","los angeles","texas","silicon valley","bay area","menlo park","palo alto"],
-    UK: ["united kingdom","london","england","scotland"],
-    Europe: ["europe","germany","france","berlin","paris","netherlands","amsterdam","spain","italy"],
-    Middle_East: ["dubai","abu dhabi","uae","united arab emirates","saudi arabia","riyadh"],
-    Southeast_Asia: ["singapore","indonesia","malaysia","thailand","vietnam"]
-  };
-  const counts = {};
-  for (const [region, keys] of Object.entries(regions)) {
-    let count = 0;
-    for (const k of keys) {
-      const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const matches = t.match(new RegExp(escaped, "g"));
-      if (matches) count += matches.length;
-    }
-    counts[region] = count;
-  }
-  let topRegion = ""; let topCount = 0;
-  for (const [region, count] of Object.entries(counts)) {
-    if (count > topCount) { topCount = count; topRegion = region; }
-  }
-  if (topCount < 3) return "";
-  return topRegion;
-}
-
-function findSectors(text) {
-  const t = text.toLowerCase();
-  const rules = {
-    AI: ["artificial intelligence","machine learning","generative ai","genai"],
-    SaaS: ["saas","software as a service"],
-    FinTech: ["fintech","financial technology","payments","banking technology"],
-    Healthcare: ["healthcare","health tech","medical technology","biotech","life sciences"],
-    EdTech: ["edtech","education technology","online education"],
-    ClimateTech: ["climate tech","climatetech","clean tech","cleantech"],
-    Cybersecurity: ["cybersecurity","cyber security"],
-    ECommerce: ["e-commerce","ecommerce","online marketplace"],
-    Consumer: ["consumer brands","consumer technology","consumer products"],
-    DeepTech: ["deep tech","deeptech"],
-    AgriTech: ["agritech","agri tech","agriculture technology"],
-    Mobility: ["mobility","transportation technology","electric vehicles"],
-    SpaceTech: ["space tech","spacetech","space technology"]
-  };
-  const found = [];
-  for (const [sector, keys] of Object.entries(rules)) {
-    if (keys.some(k => t.includes(k))) found.push(sector);
-  }
-  return found;
-}
-
-function findTags(text) {
-  const t = text.toLowerCase();
-  const rules = {
-    "Pre-Seed": ["pre-seed","pre seed"],
-    Seed: ["seed stage","seed round","seed funding"],
-    "Early Stage": ["early stage","early-stage"],
-    "Series A": ["series a"],
-    "Series B": ["series b"],
-    B2B: ["b2b","business to business"],
-    B2C: ["b2c","business to consumer"],
-    "Lead Investor": ["lead investor","lead investment"],
-    "Follow On": ["follow-on","follow on"],
-    "Founder Friendly": ["founder friendly","founder-focused","founder focused"],
-    Global: ["global","international"]
-  };
-  const found = [];
-  for (const [tag, keys] of Object.entries(rules)) {
-    if (keys.some(k => t.includes(k))) found.push(tag);
-  }
-  return found;
-}
-
-function findLatestYear(text) {
-  const matches = text.match(/\b(20\d{2})\b/g) || [];
-  const years = matches.map(Number).filter(y => y >= 2015 && y <= 2026);
-  return years.length ? Math.max(...years) : null;
-}
-
-const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
-
-const VALID_TLDS = new Set([
-  "com","org","net","io","co","ai","vc","in","us","uk","de","fr","es","it","nl",
-  "sg","hk","jp","kr","cn","au","ca","br","mx","za","ng","ke","il","ae","sa",
-  "ch","se","no","dk","fi","be","at","ie","pt","gr","pl","cz","ro","ru","tr",
-  "biz","info","me","tv","app","dev","tech","xyz","live","online","site",
-  "capital","ventures","fund","finance","bank","exchange","email","group","company",
-  "partners","investments","holdings","ltd","inc"
-]);
-
-const BLOCKED_LOCAL_PARTS = ["noreply","no-reply","donotreply","do-not-reply","postmaster","abuse","webmaster","hostmaster","press","media","pr","news","marketing"];
-
-const BLOCKED_DOMAINS = [
-  "example.com","example.org","example.net","test.com","domain.com","yourdomain.com",
-  "email.com","sentry.io","ingest.sentry.io","sentry.wixpress.com","wixpress.com",
-  "squarespace.com","godaddy.com","shopify.com","wix.com","weebly.com",
-  "google-analytics.com","googletagmanager.com","google.com","gstatic.com",
-  "doubleclick.net","googlesyndication.com","cloudflare.com","cloudflareinsights.com",
-  "cdn.jsdelivr.net","unpkg.com","newrelic.com","nr-data.net","hotjar.com",
-  "intercom.io","schema.org","w3.org","fb.com","facebook.com","twitter.com",
-  "instagram.com","linkedin.com"
-];
-
-const GENERIC_LOCALS = ["info","contact","hello","admin","support","sales","team","office","enquiries","enquiry","inquiries","inquiry","help","mail"];
-
-function looksLikeJunk(email) {
-  const local = email.split("@")[0] || "";
-  if (local.length > 30) return true;
-  if (/[a-z]{15,}/.test(local)) return true;
-  if (/mailto|http|www/i.test(local)) return true;
-  if (/^u003/i.test(local)) return true;
-  if (/^[0-9a-f]{16,}$/i.test(local)) return true;
-  if (/^\d+$/.test(local)) return true;
-  if (/^(privacy|legal|terms|cookies|gdpr|dmca|abuse|accessibility)/.test(local)) return true;
-  return false;
-}
+// ---------- EMAIL VALIDATION ----------
+const FILE_EXT_REGEX = /\.(png|jpe?g|gif|svg|webp|ico|bmp|tiff|css|js|json|xml|html?|pdf|zip|rar|woff2?|ttf|eot|mp[34]|avi|mov|wav)$/i;
+const FILE_HINT_REGEX = /(logo|icon|sprite|image|img[_-]|_x\d|edited|resize|crop|thumb|banner|hero|background|bg[_-]|@\d+x|_\d+x\d+|screenshot|whatsapp|asset|upload)/i;
 
 function isValidEmail(email) {
-  if (!email || email.length > 80) return false;
-  const parts = email.split("@");
-  if (parts.length !== 2) return false;
-  const [local, domain] = parts;
+  if (!email || typeof email !== "string") return false;
+  if (email.length > 80 || email.length < 6) return false;
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._%+-]{1,40}@[a-zA-Z0-9][a-zA-Z0-9.-]{1,40}\.[a-z]{2,6}$/i.test(email)) return false;
+
+  const [local, domain] = email.split("@");
   if (!local || !domain) return false;
-  const localLower = local.toLowerCase();
-  const domainLower = domain.toLowerCase();
-  if (!domainLower.includes(".")) return false;
-  if (/\.\./.test(localLower) || /\.\./.test(domainLower)) return false;
-  const tld = domainLower.split(".").pop();
-  if (!VALID_TLDS.has(tld)) return false;
-  if (BLOCKED_LOCAL_PARTS.includes(localLower)) return false;
-  if (BLOCKED_DOMAINS.includes(domainLower)) return false;
-  if (BLOCKED_DOMAINS.some(b => domainLower.endsWith("." + b))) return false;
-  if (looksLikeJunk(email)) return false;
+  if (local.length < 2 || local.length > 40) return false;
+  if (domain.length < 4 || domain.length > 60) return false;
+
+  if (FILE_EXT_REGEX.test(email)) return false;
+  if (FILE_HINT_REGEX.test(local)) return false;
+  if (FILE_HINT_REGEX.test(domain)) return false;
+
+  const tld = domain.split(".").pop().toLowerCase();
+  if (["png", "jpg", "jpeg", "gif", "svg", "webp", "ico", "css", "js"].includes(tld)) return false;
+  if ((local.match(/\./g) || []).length > 1) return false;
+  if (/\.\w{2,4}\.\w{2,4}/.test(local)) return false;
+  if (/^\d+$/.test(local)) return false;
+  if (domain.split(".").length > 3) return false;
+  if (tld.length > 6) return false;
+
   return true;
 }
 
-function scoreEmail(email, source, weight) {
-  const local = email.split("@")[0].toLowerCase();
-  const isGeneric = GENERIC_LOCALS.includes(local);
-  if (source === "mailto") return isGeneric ? 4 : 7;
-  if (source === "cf-decoded") return isGeneric ? 4 : 7;
-  if (source === "data-attr") return isGeneric ? 3 : 5;
-  if (source === "json-ld") return isGeneric ? 4 : 7;
-  if (source === "footer") return isGeneric ? 4 : 6;
-  if (source === "pattern") return 2;
-  if (weight >= 6) return isGeneric ? 3 : 6;
-  if (weight >= 5) return isGeneric ? 2 : 4;
-  return isGeneric ? 1 : 2;
-}
-
-function findEmails($, text, url = "", jsonLd = null) {
-  const found = new Map();
-  const isPortfolioPage = /portfolio|companies|investments|backed|funded/i.test(url);
-  let firmBaseDomain = "";
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
-    firmBaseDomain = host.split(".").slice(-2).join(".");
-  } catch {}
-
-  function add(email, source, weight) {
-    email = String(email || "").toLowerCase().trim().replace(/[.,;:!?]+$/, "");
-    if (!isValidEmail(email)) return;
-    if (source !== "mailto" && source !== "data-attr" && source !== "json-ld" && source !== "pattern" && source !== "cf-decoded" && firmBaseDomain) {
-      const emailDomain = email.split("@")[1];
-      if (!emailDomain) return;
-      const emailBase = emailDomain.split(".").slice(-2).join(".");
-      const personal = ["gmail.com","yahoo.com","outlook.com","hotmail.com","icloud.com"];
-      if (emailBase !== firmBaseDomain && !personal.includes(emailDomain)) return;
-    }
-    const prev = found.get(email);
-    if (!prev || prev.weight < weight) found.set(email, { source, weight });
-  }
-
-  if (jsonLd && jsonLd.email) add(jsonLd.email, "json-ld", 12);
-
-  const rawHtml = $.html();
-  const cfPattern = /<a[^>]*class="__cf_email__"[^>]*data-cfemail="([a-f0-9]+)"[^>]*>/gi;
-  let cfMatch;
-  while ((cfMatch = cfPattern.exec(rawHtml)) !== null) {
-    try {
-      const decoded = decodeCfEmail(cfMatch[1]);
-      if (decoded) add(decoded, "cf-decoded", 11);
-    } catch {}
-  }
-
-  $('a[href^="mailto:"]').each((_, el) => {
-    const href = $(el).attr("href") || "";
-    const raw = href.replace(/^mailto:/i, "").split("?")[0].trim();
-    add(raw, "mailto", 10);
-  });
-
-  $('[data-href^="mailto:"], [data-mailto]').each((_, el) => {
-    const href = $(el).attr("data-href") || $(el).attr("data-mailto") || "";
-    const raw = href.replace(/^mailto:/i, "").split("?")[0].trim();
-    if (raw) add(raw, "mailto", 9);
-  });
-
-  $("[data-email]").each((_, el) => add($(el).attr("data-email") || "", "data-attr", 8));
-
-  $("footer, .footer, #footer, .site-footer, .bottom-footer").each((_, el) => {
-    const footerText = cleanText($(el).text());
-    const footerEmails = footerText.match(EMAIL_REGEX) || [];
-    for (const m of footerEmails) add(m, "footer", 8);
-    $(el).find('a[href^="mailto:"]').each((_, mel) => {
-      const href = $(mel).attr("href") || "";
-      const raw = href.replace(/^mailto:/i, "").split("?")[0].trim();
-      add(raw, "mailto", 10);
+// ---------- REAL EMAIL EXTRACTION ----------
+function extractEmailsFromMailto($) {
+  const emails = new Set();
+  $("a[href]").each((_, el) => {
+    let href = $(el).attr("href") || "";
+    if (!/^mailto:/i.test(href)) return;
+    href = href.replace(/^mailto:/i, "").split("?")[0].trim();
+    href.split(/[,;]/).forEach(e => {
+      const email = e.trim().toLowerCase();
+      if (isValidEmail(email)) emails.add(email);
     });
   });
-
-  if (!isPortfolioPage) {
-    const cleanBody = text.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ");
-    const matches = cleanBody.match(EMAIL_REGEX) || [];
-    for (const m of matches) {
-      const idx = cleanBody.toLowerCase().indexOf(m.toLowerCase());
-      const context = cleanBody.slice(Math.max(0, idx - 100), idx + m.length + 100).toLowerCase();
-      let weight = 3;
-      if (/contact|email|reach|enquir|inquir|write to/.test(context)) weight = 6;
-      if (/partner|founder|investor|principal|managing director/.test(context)) weight = 7;
-      add(m, "body", weight);
-    }
-  }
-
-  const decodedHtml = rawHtml
-    .replace(/&#64;/g, "@").replace(/&#46;/g, ".")
-    .replace(/&#x40;/gi, "@").replace(/&#x2e;/gi, ".")
-    .replace(/&commat;/g, "@").replace(/&period;/g, ".");
-
-  const atDecoded = decodedHtml
-    .replace(/\s*\[at\]\s*/gi, "@").replace(/\s*\(at\)\s*/gi, "@").replace(/\s*\{at\}\s*/gi, "@")
-    .replace(/\s*\[dot\]\s*/gi, ".").replace(/\s*\(dot\)\s*/gi, ".").replace(/\s*\{dot\}\s*/gi, ".");
-
-  const decodedMatches = atDecoded.match(EMAIL_REGEX) || [];
-  for (const m of decodedMatches) {
-    if (m.includes("@") && isValidEmail(m)) add(m, "body", 6);
-  }
-
-  if (found.size === 0 && firmBaseDomain && !isPortfolioPage) {
-    for (const local of ["info", "contact"]) {
-      const candidate = `${local}@${firmBaseDomain}`;
-      if (!found.has(candidate)) found.set(candidate, { source: "pattern", weight: 1 });
-    }
-  }
-
-  return [...found.entries()]
-    .map(([email, meta]) => ({ email, source: meta.source, weight: meta.weight, score: scoreEmail(email, meta.source, meta.weight) }))
-    .sort((a, b) => b.score - a.score).slice(0, 5);
+  return [...emails];
 }
 
-function findLinkedIn($, jsonLd = null) {
-  const found = new Map();
-  const seenPaths = new Set();
-
-  if (jsonLd && jsonLd.social && jsonLd.social.linkedin) {
-    try {
-      const parsed = new URL(jsonLd.social.linkedin);
-      const parts = parsed.pathname.toLowerCase().split("/").filter(Boolean);
-      if (parts.length >= 2) {
-        seenPaths.add(`${parts[0]}/${parts[1]}`);
-        found.set(jsonLd.social.linkedin, { url: jsonLd.social.linkedin, score: parts[0] === "in" ? 5 : 3 });
-      }
-    } catch {}
-  }
-
-  $("a").each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href || !href.toLowerCase().includes("linkedin.com")) return;
-    try {
-      const parsed = new URL(href);
-      parsed.hash = ""; parsed.search = "";
-      const url = parsed.href;
-      const path = parsed.pathname.toLowerCase();
-      if (path.includes("/share") || path.includes("sharearticle")) return;
-      const parts = path.split("/").filter(Boolean);
-      if (parts.length < 2) return;
-      const type = parts[0]; const slug = parts[1];
-      const dedupeKey = `${type}/${slug}`;
-      if (seenPaths.has(dedupeKey)) return;
-      seenPaths.add(dedupeKey);
-      let score = 1;
-      if (type === "in") score = 5;
-      else if (type === "company") score = 3;
-      found.set(url, { url, score });
-    } catch {}
-  });
-
-  return [...found.values()].sort((a, b) => b.score - a.score).slice(0, 10);
+function extractEmailsFromText(text) {
+  if (!text) return [];
+  const emailRegex = /\b[a-zA-Z][a-zA-Z0-9._%+-]{1,39}@[a-zA-Z0-9][a-zA-Z0-9.-]{1,39}\.[a-z]{2,6}\b/gi;
+  const raw = text.match(emailRegex) || [];
+  return unique(raw.map(e => e.toLowerCase()).filter(isValidEmail));
 }
 
-function findPhones(text) {
-  const matches = text.match(/(?:\+?\d[\d\s().-]{7,}\d)/g);
-  if (!matches) return [];
-  return unique(matches.map(p => p.replace(/[^\d+]/g, "").trim()).filter(p => {
-    const d = p.replace(/\D/g, "");
-    return d.length >= 10 && d.length <= 15;
-  })).slice(0, 2);
-}
+// ---------- PHONE EXTRACTION ----------
+function extractPhones(text) {
+  if (!text) return [];
 
-function findName($, text) {
-  const selectors = ['[itemprop="name"]',".investor-name",".person-name",".profile-name",".team-member-name"];
-  for (const s of selectors) {
-    const v = cleanText($(s).first().text());
-    if (v && v.split(/\s+/).length >= 2 && v.split(/\s+/).length <= 4 && v.length < 60) return v;
-  }
-  const patterns = [/(?:partner|founder|co-founder|investor|principal|director|managing partner)\s*[:\-]\s*([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){1,3})/];
-  for (const p of patterns) {
-    const m = text.match(p);
-    if (m) return cleanText(m[1]);
-  }
-  return "";
-}
-
-function findCompany($, url, jsonLd = null, og = null) {
-  if (jsonLd && jsonLd.name && jsonLd.name.length < 80) return jsonLd.name;
-  if (og && og.siteName && og.siteName.length < 60 && !/^(home|welcome|blog|news)$/i.test(og.siteName)) return og.siteName;
-  const legal = cleanText($('[itemprop="legalName"]').first().text());
-  if (legal && legal.length < 80) return legal;
-  const selectors = [".company-name",".firm-name",".fund-name",".organization-name"];
-  for (const s of selectors) {
-    const v = cleanText($(s).first().text());
-    if (v && v.length < 80) return v;
-  }
-  const title = cleanText($("title").first().text());
-  if (title) {
-    const cleaned = title.replace(/\s*[\|\-–—]\s*.*$/, "").replace(/\s+/g, " ").trim();
-    const junk = ["top ","best ","how to ","how we ","guide to ","legal ","privacy ","terms ","disclosure","cookie","faq","blog","news","home","we invest","insights","report","profile","about ","contact ","sign in","log in"];
-    const low = cleaned.toLowerCase();
-    if (!junk.some(p => low.includes(p)) && cleaned.length < 60 && !cleaned.includes(":") && cleaned.split(/\s+/).length <= 5) {
-      return cleaned;
-    }
-  }
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, "");
-    const parts = host.split(".");
-    if (parts.length >= 2) {
-      let name = parts[0].replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-      name = name.replace(/\s+(Vc|Capital|Ventures|Investments|Partners|Holdings)$/i, "");
-      return name;
-    }
-  } catch {}
-  return "";
-}
-
-function findPortfolio(text) {
-  const companies = new Set();
-  const portfolioBlocks = text.match(/(?:portfolio|companies|investments|backed|invested in|portfolio companies)\s*[:\-–]\s*([^\n.]{10,300})/gi) || [];
-  for (const block of portfolioBlocks) {
-    const cleaned = block.replace(/^[^:]+[:\-–]\s*/, "");
-    const parts = cleaned.split(/[,;•·|]/).map(s => s.trim()).filter(Boolean);
-    for (const p of parts) {
-      const name = p.replace(/^(and|or|the|a|an)\s+/i, "").trim();
-      if (name.length >= 3 && name.length <= 40 && /^[A-Z]/.test(name) && !name.includes("@") && !name.includes("http")) {
-        companies.add(name);
-      }
-    }
-  }
-  const investedIn = text.match(/invested in\s+([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+)?)/g) || [];
-  for (const m of investedIn) {
-    const name = m.replace(/^invested in\s+/i, "").trim();
-    if (name.length >= 3 && name.length <= 40) companies.add(name);
-  }
-  return [...companies].slice(0, 10);
-}
-
-function findThesis(text) {
   const patterns = [
-    /(?:our thesis|investment thesis|we invest in|we back|focused on|we look for|our focus is)\s*[:\-–]?\s*([^\n.]{20,250})/i,
-    /(?:thesis|focus|strategy)\s*[:\-–]\s*([^\n.]{20,250})/i
+    /\+91[\s\-]?[6-9]\d{9}\b/g,
+    /\b0(11|22|33|44|40|80|79|20|124|120|172|141|522|712|755|821|824|836|866|870|891)[\s\-]\d{6,8}\b/g,
+    /\+1[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{4}\b/g,
+    /\+44[\s\-]?\d{2,4}[\s\-]?\d{3,4}[\s\-]?\d{4}\b/g,
+    /\+\d{2,3}[\s\-]\d{2,5}[\s\-]\d{3,5}([\s\-]\d{3,5})?\b/g
   ];
+
+  const found = new Set();
+
   for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match && match[1]) {
-      const thesis = cleanText(match[1]).slice(0, 250);
-      if (thesis.length >= 20) return thesis;
+    const matches = text.match(pattern) || [];
+    for (const raw of matches) {
+      const cleaned = raw.trim();
+      const digits = cleaned.replace(/\D/g, "");
+      if (digits.length < 10 || digits.length > 15) continue;
+      if (/^(\d)\1+$/.test(digits)) continue;
+      if (/^(0123456789|1234567890|9876543210|1122334455)/.test(digits)) continue;
+      if (new Set(digits.split("")).size < 7) continue;
+      if (/(\d)\1{3,}/.test(digits)) continue;
+      const hasValidPrefix = cleaned.startsWith("+") || cleaned.startsWith("0") || /^[6-9]\d{9}$/.test(digits);
+      if (!hasValidPrefix) continue;
+      found.add(cleaned);
     }
   }
-  return "";
+
+  return [...found].slice(0, 2);
 }
 
-function extractTeamMembers($, url, base) {
-  const people = [];
-  const seenLinkedIn = new Set();
-  const seenNames = new Set();
+// ---------- COMPANY NAME ----------
+const BAD_COMPANY_PATTERNS = [
+  /^welcome\b/i, /^invest\s+with\b/i, /^build\s+(a|your)\b/i,
+  /^we\s+(are|help|build|invest|love)/i, /^the\s+(best|leading|top|future|next|only)/i,
+  /^our\s+/i, /^why\s+/i, /^how\s+/i, /^what\s+/i,
+  /portfolio\s+with/i, /multi-bagger/i, /^home\s*page/i, /^home$/i,
+  /^click\s+/i, /^read\s+/i, /^learn\s+/i, /^explore\s+/i, /^get\s+/i,
+  /^let'?s\s+/i, /\?$/, /!$/, /\blorem\b/i, /\bipsum\b/i
+];
 
-  $('a[href*="linkedin.com/in/"]').each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href) return;
+function isBadCompanyName(name) {
+  if (!name) return true;
+  if (name.length < 2 || name.length > 60) return true;
+  const words = name.split(" ").filter(w => w.length > 0);
+  if (words.length < 1 || words.length > 5) return true;
+  if (/^\d/.test(name)) return true;
+  if (BAD_COMPANY_PATTERNS.some(p => p.test(name))) return true;
+  const hasCapitalWord = words.some(w => /^[A-Z]/.test(w));
+  if (!hasCapitalWord) return true;
+  const lowerWords = words.filter(w => w.length > 2 && w[0] === w[0].toLowerCase()).length;
+  if (lowerWords > 1) return true;
+  return false;
+}
+
+function extractCompanyName($, sourceUrl) {
+  const candidates = [];
+
+  $('script[type="application/ld+json"]').each((_, el) => {
     try {
-      const parsed = new URL(href);
-      parsed.hash = ""; parsed.search = "";
-      const linkedinUrl = parsed.href;
-      const pathParts = parsed.pathname.toLowerCase().split("/").filter(Boolean);
-      if (pathParts.length < 2 || pathParts[0] !== "in") return;
-      const slug = pathParts[1];
-      if (seenLinkedIn.has(slug)) return;
-      seenLinkedIn.add(slug);
-
-      const $el = $(el);
-      let name = "";
-      const linkText = cleanText($el.text());
-      if (linkText && linkText.split(/\s+/).length >= 2 && linkText.split(/\s+/).length <= 4 && linkText.length < 60 && !/linkedin|profile|view/i.test(linkText)) name = linkText;
-      if (!name) {
-        const parent = $el.closest("div, li, article, section, td");
-        if (parent.length) {
-          const heading = cleanText(parent.find("h1, h2, h3, h4, h5, strong, .name, .person-name").first().text());
-          if (heading && heading.split(/\s+/).length >= 2 && heading.split(/\s+/).length <= 4 && heading.length < 60) name = heading;
-        }
+      const data = JSON.parse($(el).html());
+      const items = Array.isArray(data) ? data : [data];
+      for (const item of items) {
+        const type = item?.["@type"];
+        const isOrg = Array.isArray(type)
+          ? type.some(t => /Organization|Corporation|LocalBusiness|WebSite/i.test(t))
+          : /Organization|Corporation|LocalBusiness|WebSite/i.test(type || "");
+        if (isOrg && item.name) candidates.push({ text: item.name, priority: 1 });
+        if (item?.legalName) candidates.push({ text: item.legalName, priority: 1 });
+        if (item?.publisher?.name) candidates.push({ text: item.publisher.name, priority: 2 });
       }
-      if (!name) return;
-      if (!/^[A-Z][a-z]+/.test(name)) return;
-      if (seenNames.has(name.toLowerCase())) return;
-      seenNames.add(name.toLowerCase());
-
-      let title = "";
-      const parent = $el.closest("div, li, article, section, td");
-      if (parent.length) {
-        const titleEl = parent.find(".title, .role, .position, .job-title, p").first().text();
-        if (titleEl) title = cleanText(titleEl).slice(0, 100);
-      }
-
-      let personEmail = "";
-      if (parent.length) {
-        const mailtoEl = parent.find('a[href^="mailto:"]').first();
-        if (mailtoEl.length) {
-          const mhref = mailtoEl.attr("href") || "";
-          const raw = mhref.replace(/^mailto:/i, "").split("?")[0].trim();
-          if (isValidEmail(raw)) personEmail = raw.toLowerCase();
-        }
-      }
-
-      const emailDetails = personEmail ? [{ email: personEmail, source: "mailto", weight: 10, score: 7 }] : [];
-
-      people.push({
-        name, company_name: base.company_name, investor_type: base.investor_type,
-        region: base.region, sectors: base.sectors, tags: base.tags, description: title,
-        portfolio: [], thesis: "",
-        emails: personEmail ? [personEmail] : [], email_details: emailDetails,
-        email_score: emailDetails.reduce((s, e) => s + e.score, 0),
-        linkedin: [linkedinUrl], linkedin_details: [{ url: linkedinUrl, score: 5 }], linkedin_score: 5,
-        phones: [], latest_year: base.latest_year, is_fresh: base.is_fresh,
-        website: base.website, source_url: url, crawl_type: "team_member"
-      });
     } catch {}
   });
 
-  $("h2, h3, h4, .team-member, .person, .member, .team-card, .profile-card").each((_, el) => {
-    const $el = $(el);
-    const name = cleanText($el.text());
-    if (!name) return;
-    if (name.split(/\s+/).length < 2 || name.split(/\s+/).length > 4) return;
-    if (name.length > 60) return;
-    if (/^(our team|team|leadership|management|advisors|about|portfolio|investments|contact|home|board|founders|partners|staff|people)$/i.test(name)) return;
-    if (!/^[A-Z][a-z]+/.test(name)) return;
-    if (seenNames.has(name.toLowerCase())) return;
-    seenNames.add(name.toLowerCase());
+  const ogSite = $('meta[property="og:site_name"]').attr("content");
+  if (ogSite) candidates.push({ text: ogSite.trim(), priority: 2 });
 
-    const parent = $el.closest("div, li, article, section, td, .card, .profile-card, .team-card");
-    if (!parent.length) return;
+  const twSite = $('meta[name="twitter:site"]').attr("content");
+  if (twSite) candidates.push({ text: twSite.replace("@", "").trim(), priority: 3 });
 
-    let title = "";
-    const titleEl = parent.find(".title, .role, .position, .job-title, p, .designation").first().text();
-    if (titleEl) title = cleanText(titleEl).slice(0, 100);
-    if (/^(we|our|the|this|read|view|click|learn|next|previous|all|more)/i.test(title)) title = "";
-
-    let linkedinUrl = "";
-    const liEl = parent.find('a[href*="linkedin.com/in/"]').first();
-    if (liEl.length) {
-      try {
-        const parsed = new URL(liEl.attr("href"));
-        parsed.hash = ""; parsed.search = "";
-        linkedinUrl = parsed.href;
-      } catch {}
-    }
-
-    let personEmail = "";
-    const mailtoEl = parent.find('a[href^="mailto:"]').first();
-    if (mailtoEl.length) {
-      const mhref = mailtoEl.attr("href") || "";
-      const raw = mhref.replace(/^mailto:/i, "").split("?")[0].trim();
-      if (isValidEmail(raw)) personEmail = raw.toLowerCase();
-    }
-
-    const emailDetails = personEmail ? [{ email: personEmail, source: "mailto", weight: 10, score: 7 }] : [];
-
-    people.push({
-      name, company_name: base.company_name, investor_type: base.investor_type,
-      region: base.region, sectors: base.sectors, tags: base.tags, description: title,
-      portfolio: [], thesis: "",
-      emails: personEmail ? [personEmail] : [], email_details: emailDetails,
-      email_score: emailDetails.reduce((s, e) => s + e.score, 0),
-      linkedin: linkedinUrl ? [linkedinUrl] : [],
-      linkedin_details: linkedinUrl ? [{ url: linkedinUrl, score: 5 }] : [],
-      linkedin_score: linkedinUrl ? 5 : 0,
-      phones: [], latest_year: base.latest_year, is_fresh: base.is_fresh,
-      website: base.website, source_url: url, crawl_type: "team_member"
+  const title = $("title").text().trim();
+  if (title) {
+    title.split(/[\|–—•·]/).map(p => p.trim()).filter(Boolean).forEach((p, idx) => {
+      candidates.push({ text: p, priority: 4 + idx });
     });
+  }
+
+  const h1 = $("h1").first().text().trim();
+  if (h1) candidates.push({ text: h1, priority: 10 });
+
+  let domainName = "";
+  try {
+    const host = new URL(sourceUrl).hostname.replace(/^www\./, "");
+    const namePart = host.split(".")[0];
+    if (namePart && namePart.length > 1 && !/^\d+$/.test(namePart)) {
+      domainName = namePart.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    }
+  } catch {}
+
+  candidates.sort((a, b) => a.priority - b.priority);
+  for (const c of candidates) {
+    const name = cleanText(c.text);
+    if (!isBadCompanyName(name)) return name;
+  }
+
+  return domainName;
+}
+
+// ---------- PERSON NAMES ----------
+const TITLE_WORDS = ["partner", "managing", "general", "principal", "director", "founder", "co-founder", "cofounder", "ceo", "cto", "cfo", "coo", "associate", "analyst", "vice president", "vp", "head of", "lead", "investor", "advisor", "chairman", "board"];
+
+function looksLikeName(text) {
+  if (!text || text.length < 4 || text.length > 40) return false;
+  const words = text.split(" ").filter(w => w.length > 0);
+  if (words.length < 2 || words.length > 4) return false;
+  if (!words.every(w => /^[A-Z][a-zA-Z'.-]+$/.test(w))) return false;
+  if (/^(home|about|contact|team|news|blog|press|careers|read|learn)/i.test(text)) return false;
+  if (TITLE_WORDS.some(t => text.toLowerCase().includes(t))) return false;
+  return true;
+}
+
+function extractPersonNames($) {
+  const names = new Set();
+
+  $("a[href*='linkedin.com/in/']").each((_, el) => {
+    const href = $(el).attr("href") || "";
+    const m = href.match(/linkedin\.com\/in\/([a-z0-9\-_]+)/i);
+    if (m) {
+      const parts = m[1].toLowerCase().split(/[-_]/).filter(p => p.length > 1 && !/^\d+$/.test(p));
+      if (parts.length >= 2 && parts.length <= 4) {
+        const name = parts.map(p => p[0].toUpperCase() + p.slice(1)).join(" ");
+        if (looksLikeName(name)) names.add(name);
+      }
+    }
   });
 
-  return people;
-}
-
-function extractPortfolioCompanies($, url) {
-  const companies = [];
-  const seen = new Set();
-  const selectors = [".portfolio-item", ".company-card", ".portfolio-card", ".startup-card", ".portfolio-company", ".investment", "article", "li.portfolio"];
-  let found = false;
-
-  for (const selector of selectors) {
-    const items = $(selector);
-    if (items.length === 0) continue;
-
-    items.each((_, el) => {
-      const $el = $(el);
-      const text = cleanText($el.text());
-      if (!text || text.length < 5 || text.length > 500) return;
-
-      let companyName = cleanText($el.find("h1, h2, h3, h4, h5, strong, .company-name, .name").first().text());
-      if (!companyName || companyName.length < 2 || companyName.length > 60) return;
-      if (seen.has(companyName.toLowerCase())) return;
-      seen.add(companyName.toLowerCase());
-
-      let founderName = "";
-      const fm = text.match(/(?:founder|co-founder|ceo)[\s:\-]*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,2})/);
-      if (fm) founderName = fm[1];
-
-      const sectors = findSectors(text);
-
-      let website = "";
-      const linkEl = $el.find('a[href^="http"]').first();
-      if (linkEl.length) {
-        const href = linkEl.attr("href");
-        if (href && !href.includes("twitter") && !href.includes("linkedin") && !href.includes("facebook")) website = href;
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      const data = JSON.parse($(el).html());
+      const items = Array.isArray(data) ? data : [data];
+      for (const item of items) {
+        if (item?.["@type"] === "Person" && item.name && looksLikeName(item.name)) {
+          names.add(cleanText(item.name));
+        }
       }
+    } catch {}
+  });
 
-      const linkedin = findLinkedIn($el);
+  $("h2, h3, h4").each((_, el) => {
+    const text = cleanText($(el).text());
+    if (!looksLikeName(text)) return;
+    const context = ($(el).next().text() + " " + $(el).parent().text().slice(0, 200)).toLowerCase();
+    if (TITLE_WORDS.some(w => context.includes(w))) names.add(text);
+  });
 
-      companies.push({
-        name: founderName || "", company_name: companyName, investor_type: "Startup",
-        region: "", sectors, tags: ["Portfolio Company"],
-        portfolio: [companyName], thesis: "",
-        emails: [], email_details: [], email_score: 0,
-        linkedin: linkedin.map(l => l.url), linkedin_details: linkedin,
-        linkedin_score: linkedin.reduce((s, l) => s + l.score, 0),
-        phones: [], latest_year: findLatestYear(text),
-        is_fresh: (findLatestYear(text) || 0) >= 2024,
-        description: founderName ? `Founder: ${founderName}` : "",
-        website: website || url, source_url: url, crawl_type: "portfolio_company"
-      });
-      found = true;
-    });
-
-    if (found) break;
-  }
-
-  return companies.slice(0, 30);
+  return [...names].slice(0, 10);
 }
 
-function extractInvestorData($, url) {
+// ---------- LINKEDIN ----------
+function extractLinkedIn($) {
+  const links = new Set();
+  $("a[href]").each((_, el) => {
+    let href = $(el).attr("href") || "";
+    if (href.startsWith("/")) href = "https://www.linkedin.com" + href;
+    if (!href.startsWith("http")) href = "https://" + href;
+    if (/linkedin\.com\/(in|company)\//i.test(href)) links.add(href.split("?")[0]);
+  });
+  return [...links];
+}
+
+function scoreLinkedIn(url) {
+  if (url.includes("/in/")) return 5;
+  if (url.includes("/company/")) return 3;
+  return 1;
+}
+
+// ---------- CORE PIPELINE WITH PATTERN GENERATION ----------
+function extractAllContacts($, url) {
   const text = cleanText($("body").text());
-  const jsonLd = findJsonLd($);
-  const og = findOpenGraph($);
+  const mailtoEmails = extractEmailsFromMailto($);
+  const bodyEmails = extractEmailsFromText(text);
+  const companyName = extractCompanyName($, url);
+  const phones = extractPhones(text);
+  const linkedin = extractLinkedIn($);
+  const personNames = extractPersonNames($);
+  const domain = (() => {
+    try { return new URL(url).hostname.replace(/^www\./, ""); }
+    catch { return ""; }
+  })();
 
-  const name = findName($, text) || (jsonLd.founders && jsonLd.founders[0]) || "";
-  const company_name = findCompany($, url, jsonLd, og);
-  let investor_type = findInvestorType(text + " " + (jsonLd.industry || ""));
+  const realEmails = unique([...mailtoEmails, ...bodyEmails]);
 
-  if (company_name) {
-    const cn = company_name.toLowerCase();
-    if (/\bventures?\b|\bcapital\b|\bvc\b|\bventure\b/.test(cn)) investor_type = "Venture Capital";
-    else if (/\bfamily office\b|\bfamily fund\b/.test(cn)) investor_type = "Family Fund";
-    else if (/\bprivate equity\b|\bpe\b/.test(cn)) investor_type = "Private Equity";
-    else if (/\bangel\b|\bangels\b/.test(cn)) investor_type = "Angel Investor";
+  // 🎯 PATTERN-BASED EMAIL GENERATION
+  const patternEmails = [];
+  if (personNames.length > 0 && domain) {
+    const detectedPattern = detectPatternFromExisting(realEmails, personNames[0]);
+
+    for (const name of personNames.slice(0, 5)) {
+      const patterns = buildPatternEmails(name, domain, detectedPattern);
+      for (const p of patterns) {
+        if (!realEmails.includes(p.email) && !patternEmails.some(pe => pe.email === p.email)) {
+          patternEmails.push({ ...p, name });
+        }
+      }
+    }
   }
 
-  const region = findRegion(text + " " + (jsonLd.address || ""));
-  const sectors = findSectors(text + " " + (jsonLd.description || "") + " " + (jsonLd.industry || ""));
-  const tags = findTags(text);
-  const portfolio = findPortfolio(text);
-  const thesis = findThesis(text);
-  const emailDetails = findEmails($, text, url, jsonLd);
-  const linkedinDetails = findLinkedIn($, jsonLd);
-  const phones = findPhones(text + " " + (jsonLd.phone || ""));
-
-  const emails = emailDetails.map(e => e.email);
-  const email_score = emailDetails.reduce((s, e) => s + e.score, 0);
-  const linkedin = linkedinDetails.map(l => l.url);
-  const linkedin_score = linkedinDetails.reduce((s, l) => s + l.score, 0);
-
-  const latestYear = findLatestYear(text);
-  const isFresh = !!(latestYear && latestYear >= 2024);
+  const emailDetails = [
+    ...mailtoEmails.map(e => ({ email: e, source: "mailto", weight: 10, score: 10, verified: null })),
+    ...bodyEmails.filter(e => !mailtoEmails.includes(e)).map(e => ({ email: e, source: "body", weight: 7, score: 7, verified: null })),
+    ...patternEmails.map(p => ({
+      email: p.email,
+      source: "pattern",
+      weight: 3,
+      score: 3,
+      verified: null,
+      pattern: p.pattern,
+      personName: p.name
+    }))
+  ];
 
   return {
-    name, company_name, investor_type, region, sectors, tags, portfolio, thesis,
-    emails, email_details: emailDetails, email_score,
-    linkedin, linkedin_details: linkedinDetails, linkedin_score,
-    phones, latest_year: latestYear, is_fresh: isFresh,
-    description: jsonLd.description || og.description || "",
-    website: jsonLd.url || url, source_url: url,
-    crawl_type: (investor_type || sectors.length || tags.length || emails.length || linkedin.length) ? "potential_investor_page" : "general_page"
+    companyName,
+    personNames,
+    emails: unique(emailDetails.map(e => e.email)),
+    emailDetails,
+    emailScore: emailDetails.reduce((s, e) => s + (e.score || 0), 0),
+    phones,
+    linkedin,
+    linkedinDetails: linkedin.map(u => ({ url: u, score: scoreLinkedIn(u) })),
+    linkedinScore: linkedin.reduce((s, u) => s + scoreLinkedIn(u), 0),
+    text,
+    domain
   };
 }
 
-function extractMultipleInvestors($, url) {
-  const base = extractInvestorData($, url);
-  const teamMembers = extractTeamMembers($, url, base);
-
-  if (teamMembers.length > 0) {
-    const hasFirmData = (base.emails && base.emails.length > 0) || base.description;
-    const hasCompanyOrName = base.company_name || base.name;
-    if (hasFirmData && hasCompanyOrName) return [base, ...teamMembers];
-    return teamMembers;
-  }
-
-  return [base];
+// ---------- RECORD BUILDERS ----------
+function buildRecord(c, url, entityType, crawlType, name = "") {
+  return {
+    name,
+    company_name: c.companyName,
+    investor_type: entityType === "investor" ? "VC" : entityType,
+    region: "", hq_city: null,
+    sectors: [], tags: [], portfolio: [], thesis: "",
+    emails: c.emails,
+    email_details: c.emailDetails,
+    email_score: c.emailScore,
+    linkedin: c.linkedin,
+    linkedin_details: c.linkedinDetails,
+    linkedin_score: c.linkedinScore,
+    phones: c.phones,
+    latest_year: null, is_fresh: false,
+    description: c.text.substring(0, 300),
+    website: url, source_url: url, source_urls: [url],
+    investor_score: 0, confidence: "", status_code: null,
+    crawl_type: crawlType, entity_type: entityType
+  };
 }
 
-module.exports = { extractInvestorData, extractMultipleInvestors, extractPortfolioCompanies };
+function extractInvestorData($, url) {
+  const c = extractAllContacts($, url);
+  return buildRecord(c, url, "investor", "investor_page", c.personNames[0] || "");
+}
+
+function extractMultipleInvestors($, url) {
+  const c = extractAllContacts($, url);
+  if (c.personNames.length > 0) {
+    return c.personNames.map(name => buildRecord(c, url, "investor", "team_page", name));
+  }
+  return [buildRecord(c, url, "investor", "team_page")];
+}
+
+function extractPortfolioCompanies($, url) {
+  const c = extractAllContacts($, url);
+  return [buildRecord(c, url, "investor", "portfolio_page")];
+}
+
+function extractGenericEntity($, url, entityType = "wholesaler") {
+  const c = extractAllContacts($, url);
+  return buildRecord(c, url, entityType, "generic_extraction", c.personNames[0] || "");
+}
+
+module.exports = {
+  extractInvestorData,
+  extractMultipleInvestors,
+  extractPortfolioCompanies,
+  extractGenericEntity
+};

@@ -1,10 +1,19 @@
+# Dependencies
 node_modules/
-.env
 
-# Data files
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Runtime data
+data/
 crawl-results.json
-review-queue.json
 search-history.json
+review-queue.json
+
+# PDFs (optional — agar nahi chahiye GitHub pe)
+*.pdf
 
 # Logs
 *.log
@@ -13,3 +22,12 @@ npm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Secrets
+*.key
+*.pem
+secrets/

@@ -2,95 +2,139 @@
 const fs = require("fs");
 const path = require("path");
 
-const SEED_PATH = path.join(__dirname, "data", "seed-domains.json");
-
-const HIGH_AUTHORITY = [
-  "startupindia.gov.in","sebi.gov.in","startupsforall.in","ynos.in","data.gov.in","msme.gov.in",
-  "nvca.org","vcdir.com","investorhunt.co","openvc.app","signal.nfx.com","northdata.com"
-];
+let SEED_DOMAINS = [];
 
 function loadSeedDomains() {
   try {
-    const raw = fs.readFileSync(SEED_PATH, "utf8");
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) throw new Error("not an array");
-    return parsed;
-  } catch (error) {
-    console.error("Could not load seed-domains.json:", error.message);
+    const p = path.join(__dirname, "data", "seed-domains.json");
+    if (!fs.existsSync(p)) {
+      console.log(`⚠️  seed-domains.json not found at: ${p}`);
+      return [];
+    }
+    SEED_DOMAINS = JSON.parse(fs.readFileSync(p, "utf8"));
+    console.log(`✅ Loaded ${SEED_DOMAINS.length} seed domains`);
+    return SEED_DOMAINS;
+  } catch (err) {
+    console.error("Failed to load seed domains:", err.message);
     return [];
   }
 }
 
-function scoreSeed(seed, query) {
+const ENTITY_DIRECTORIES = {
+  investor: [
+    { domain: "crunchbase.com", url: "https://www.crunchbase.com", region: "Global", hq_city: null, reasons: ["investor directory"] },
+    { domain: "dealroom.co", url: "https://dealroom.co", region: "Global", hq_city: null, reasons: ["investor directory"] },
+    { domain: "signal.nfx.com", url: "https://signal.nfx.com", region: "Global", hq_city: null, reasons: ["VC directory"] }
+  ],
+  wholesaler: [
+    { domain: "indiamart.com", url: "https://www.indiamart.com", region: "India", hq_city: null, reasons: ["wholesale directory"] },
+    { domain: "tradeindia.com", url: "https://www.tradeindia.com", region: "India", hq_city: null, reasons: ["wholesale directory"] }
+  ],
+  supplier: [
+    { domain: "indiamart.com", url: "https://www.indiamart.com", region: "India", hq_city: null, reasons: ["supplier directory"] },
+    { domain: "tradeindia.com", url: "https://www.tradeindia.com", region: "India", hq_city: null, reasons: ["supplier directory"] }
+  ],
+  manufacturer: [
+    { domain: "indiamart.com", url: "https://www.indiamart.com", region: "India", hq_city: null, reasons: ["manufacturer directory"] },
+    { domain: "thomasnet.com", url: "https://www.thomasnet.com", region: "USA", hq_city: null, reasons: ["US manufacturer directory"] }
+  ],
+  exporter: [
+    { domain: "exportersindia.com", url: "https://www.exportersindia.com", region: "India", hq_city: null, reasons: ["exporter directory"] }
+  ],
+  importer: [
+    { domain: "tradeindia.com", url: "https://www.tradeindia.com", region: "India", hq_city: null, reasons: ["importer directory"] }
+  ],
+  dealer: [
+    { domain: "justdial.com", url: "https://www.justdial.com", region: "India", hq_city: null, reasons: ["business directory"] }
+  ],
+  service_provider: [
+    { domain: "justdial.com", url: "https://www.justdial.com", region: "India", hq_city: null, reasons: ["services directory"] },
+    { domain: "sulekha.com", url: "https://www.sulekha.com", region: "India", hq_city: null, reasons: ["services directory"] }
+  ]
+};
+
+function matchRegion(seed, parsed) {
+  if (!parsed.region) return true;
+  if (!seed.region) return true;
+  return seed.region.toLowerCase() === parsed.region.toLowerCase();
+}
+
+function matchCity(seed, parsed) {
+  if (!parsed.city) return true;
+  if (!seed.cities || seed.cities.length === 0) return true;
+  return seed.cities.some(c => c.toLowerCase().includes(parsed.city.toLowerCase()));
+}
+
+function scoreSeed(seed, parsed) {
   let score = 0;
   const reasons = [];
 
-  if (query.city) {
-    const seedHq = (seed.hq_city || "").toLowerCase();
-    const qCity = query.city.toLowerCase();
-    if (seedHq !== qCity) return { score: -999, reasons: [`not in ${query.city}`] };
-    score += 6;
-    reasons.push(`hq=${query.city}`);
-  }
-
-  if (query.region) {
-    if (seed.region === query.region) { score += 5; reasons.push(`region=${seed.region}`); }
-    else if (seed.region === "Global") { score += 2; reasons.push("region=Global"); }
-    else { score -= 3; }
-  }
-
-  if (query.sectors && query.sectors.length) {
-    const overlap = (seed.sectors || []).filter(s => query.sectors.includes(s));
-    if (overlap.length) { score += 3 * overlap.length; reasons.push(`sectors=${overlap.join(",")}`); }
-  }
-
-  if (query.stages && query.stages.length) {
-    const overlap = (seed.stages || []).filter(s => query.stages.includes(s));
-    if (overlap.length) { score += 2 * overlap.length; reasons.push(`stages=${overlap.join(",")}`); }
-  }
-
-  if (query.investorTypes && query.investorTypes.length) {
-    if (query.investorTypes.includes(seed.type)) { score += 2; reasons.push(`type=${seed.type}`); }
-  }
-
-  if (HIGH_AUTHORITY.includes(seed.domain)) { score += 4; reasons.push("high-authority source"); }
+  if (matchRegion(seed, parsed)) { score += 5; reasons.push(`region=${parsed.region}`); }
+  if (matchCity(seed, parsed)) { score += 5; reasons.push(`city=${parsed.city}`); }
 
   return { score, reasons };
 }
 
-function discoverSources(query, options = {}) {
-  const minScore = options.minScore ?? 1;
-  const maxSources = options.maxSources ?? 100;
+function discoverSources(parsed) {
+  loadSeedDomains();
 
-  const seeds = loadSeedDomains();
-  if (seeds.length === 0) return { query, sources: [], message: "No seed domains loaded." };
+  const entityType = parsed.entityType || "investor";
+  const sources = [];
+  const seen = new Set();
 
-  const scored = seeds.map(seed => {
-    const { score, reasons } = scoreSeed(seed, query);
-    return {
-      domain: seed.domain,
-      url: "https://" + seed.domain.replace(/^https?:\/\//, ""),
-      type: seed.type,
-      region: seed.region,
-      hq_city: seed.hq_city || null,
-      cities: seed.cities || [],
-      sectors: seed.sectors || [],
-      stages: seed.stages || [],
-      score,
-      reasons
-    };
-  });
+  console.log(`🔍 Discovering sources for entity: ${entityType}`);
 
-  const filtered = scored
-    .filter(s => s.score >= minScore)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, maxSources);
+  const directories = ENTITY_DIRECTORIES[entityType] || ENTITY_DIRECTORIES.investor;
+  for (const dir of directories) {
+    if (!seen.has(dir.domain)) {
+      seen.add(dir.domain);
+      sources.push({
+        domain: dir.domain,
+        url: dir.url,
+        type: entityType,
+        region: dir.region || parsed.region || "",
+        hq_city: dir.hq_city,
+        sectors: [],
+        stages: [],
+        score: 8,
+        reasons: dir.reasons || ["directory"]
+      });
+    }
+  }
+
+  if (entityType === "investor") {
+    for (const seed of SEED_DOMAINS) {
+      if (seen.has(seed.domain)) continue;
+      if (!matchRegion(seed, parsed)) continue;
+      if (!matchCity(seed, parsed)) continue;
+
+      const { score, reasons } = scoreSeed(seed, parsed);
+      if (score >= 5) {
+        seen.add(seed.domain);
+        sources.push({
+          domain: seed.domain,
+          url: `https://${seed.domain}`,
+          type: "VC",
+          region: seed.region || "",
+          hq_city: seed.hq_city || null,
+          cities: seed.cities || [],
+          sectors: [],
+          stages: [],
+          score,
+          reasons: reasons.length ? reasons : ["seed domain"]
+        });
+      }
+    }
+  }
+
+  sources.sort((a, b) => b.score - a.score);
+
+  console.log(`   → Found ${sources.length} sources`);
 
   return {
-    query,
-    totalConsidered: seeds.length,
-    totalMatched: filtered.length,
-    sources: filtered
+    sources,
+    totalConsidered: SEED_DOMAINS.length,
+    totalMatched: sources.length
   };
 }
 

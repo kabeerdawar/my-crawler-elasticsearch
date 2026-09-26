@@ -1,4 +1,6 @@
 // db.js
+// Supabase integration with confidence scoring + evidence URLs
+
 const { createClient } = require("@supabase/supabase-js");
 const ws = require("ws");
 
@@ -38,7 +40,7 @@ function isConfigured() {
   return configured && supabase !== null;
 }
 
-// 🎯 CHANGE: mapRecord with crawl_query
+// 🎯 mapRecord with confidence + freshness + evidence URLs
 function mapRecord(r) {
   return {
     name: r.name || "",
@@ -66,7 +68,17 @@ function mapRecord(r) {
     confidence: r.confidence || "",
     status_code: r.status_code ?? null,
     crawl_type: r.crawl_type || "",
-    crawl_query: r.crawl_query || ""   // 🎯 YEH SAVE HO RAHA HAI
+    crawl_query: r.crawl_query || "",
+    entity_type: r.entity_type || "investor",
+    // 🎯 NEW FIELDS
+    source_urls: r.source_urls || [],
+    confidence_score: r.confidence_score ?? 0,
+    confidence_breakdown: r.confidence_breakdown || [],
+    freshness_score: r.freshness_score ?? 100,
+    freshness_label: r.freshness_label || "FRESH",
+    days_since_verified: r.days_since_verified ?? 0,
+    discovery_date: r.discovery_date || new Date().toISOString(),
+    last_verified_date: r.last_verified_date || new Date().toISOString()
   };
 }
 
@@ -143,7 +155,7 @@ async function getAllInvestors() {
     const { data, error } = await supabase
       .from("investors")
       .select("*")
-      .order("investor_score", { ascending: false })
+      .order("confidence_score", { ascending: false })
       .limit(10000);
     if (error) {
       console.error("getAllInvestors error:", error.message);
@@ -163,7 +175,7 @@ async function getInvestorsByQuery(query) {
       .from("investors")
       .select("*")
       .eq("crawl_query", query)
-      .order("investor_score", { ascending: false })
+      .order("confidence_score", { ascending: false })
       .limit(1000);
     if (error) {
       console.error("getInvestorsByQuery error:", error.message);

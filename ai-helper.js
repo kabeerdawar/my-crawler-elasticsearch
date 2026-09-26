@@ -172,7 +172,75 @@ Rules:
 function aiStatus() {
   return { groq: !!GROQ_KEY, gemini: !!GEMINI_KEY };
 }
+// 🎯 Generic entity extraction (works for any entity type)
+async function aiExtractEntity(text, url, entityType = "investor") {
+  if (!aiStatus().gemini) return null;
 
+  const GEMINI_KEY = process.env.GEMINI_API_KEY;
+  if (!GEMINI_KEY) return null;
+
+  const entityDescriptions = {
+    investor: "investor, VC firm, or investment fund",
+    wholesaler: "wholesaler or bulk supplier",
+    supplier: "supplier or vendor",
+    manufacturer: "manufacturer or factory",
+    exporter: "exporter or export company",
+    importer: "importer or import company",
+    dealer: "dealer or retailer",
+    service_provider: "service provider (doctor, lawyer, consultant, etc.)"
+  };
+
+  const entityDesc = entityDescriptions[entityType] || "business entity";
+
+  const prompt = `Extract information about a ${entityDesc} from this page.
+
+URL: ${url}
+TEXT:
+${text.substring(0, 8000)}
+
+Return ONLY valid JSON:
+{
+  "name": "person name if individual, else empty",
+  "company_name": "business name",
+  "investor_type": "${entityType}",
+  "region": "country or region",
+  "hq_city": "city or null",
+  "sectors": ["industry1", "industry2"],
+  "tags": ["tag1", "tag2"],
+  "portfolio": ["product1", "product2"],
+  "thesis": "short description of business",
+  "emails": ["email1@x.com"],
+  "linkedin": ["https://linkedin.com/..."],
+  "phones": ["+91-xxx"],
+  "description": "1-2 sentence description"
+}
+
+If the page is NOT about a ${entityDesc}, return: null
+Return ONLY JSON, no markdown.`;
+
+  try {
+    const res = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 2000,
+        }
+      },
+      { timeout: 30000 }
+    );
+
+    const responseText = res.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    
+    return JSON.parse(jsonMatch[0]);
+  } catch (err) {
+    console.error("Gemini entity extraction failed:", err.message);
+    return null;
+  }
+}
 module.exports = {
   groqQuery,
   geminiExtract,

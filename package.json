@@ -3,18 +3,25 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "This is a web crawler tha automatically visits pages, follows links, and pulls out the data you want",
   "dependencies": {
+    "@elastic/elasticsearch": "^8.19.2",
     "@supabase/supabase-js": "^2.109.0",
+    "@xenova/transformers": "^2.17.2",
+    "apify-client": "^2.25.0",
     "axios": "^1.20.0",
     "cheerio": "^1.2.0",
-    "dotenv": "^18.0.1",
+    "dns": "^0.2.2",
+    "dotenv": "^18.0.4",
     "express": "^5.2.1",
+    "fuse.js": "^7.5.0",
+    "net": "^1.0.2",
     "playwright": "^1.63.0",
     "robots-parser": "^3.0.1",
     "ws": "^8.21.3",

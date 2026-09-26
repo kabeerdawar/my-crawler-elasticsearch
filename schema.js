@@ -1,67 +1,272 @@
 // schema.js
-// Bulletproof lenient validation
+// 🎯 Multi-entity validation with explainable confidence scoring
 
-function cleanRecord(raw) {
-  if (!raw) return null;
-  const r = { ...raw };
-
-  r.name = typeof r.name === "string" ? r.name : "";
-  r.company_name = typeof r.company_name === "string" ? r.company_name : "";
-  r.investor_type = typeof r.investor_type === "string" ? r.investor_type : "";
-  r.region = typeof r.region === "string" ? r.region : "";
-  r.description = typeof r.description === "string" ? r.description : "";
-  r.website = typeof r.website === "string" ? r.website : "";
-  r.crawl_type = typeof r.crawl_type === "string" ? r.crawl_type : "general_page";
-  r.source_url = typeof r.source_url === "string" ? r.source_url : "";
-
-  r.sectors = Array.isArray(r.sectors) ? r.sectors.filter(s => typeof s === "string" && s.trim()) : [];
-  r.tags = Array.isArray(r.tags) ? r.tags.filter(s => typeof s === "string" && s.trim()) : [];
-  r.cities = Array.isArray(r.cities) ? r.cities.filter(s => typeof s === "string" && s.trim()) : [];
-  r.phones = Array.isArray(r.phones) ? r.phones.filter(s => typeof s === "string" && s.trim()) : [];
-
-  r.emails = Array.isArray(r.emails)
-    ? r.emails.filter(e => typeof e === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
-    : [];
-
-  r.email_details = Array.isArray(r.email_details)
-    ? r.email_details.filter(e => e && typeof e.email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.email))
-    : [];
-
-  r.email_score = typeof r.email_score === "number" ? r.email_score : 0;
-
-  r.linkedin = Array.isArray(r.linkedin)
-    ? r.linkedin.filter(u => typeof u === "string" && u.startsWith("http"))
-    : [];
-
-  r.linkedin_details = Array.isArray(r.linkedin_details)
-    ? r.linkedin_details.filter(l => l && typeof l.url === "string" && l.url.startsWith("http"))
-    : [];
-
-  r.linkedin_score = typeof r.linkedin_score === "number" ? r.linkedin_score : 0;
-  r.investor_score = typeof r.investor_score === "number" ? r.investor_score : 0;
-  r.latest_year = typeof r.latest_year === "number" ? r.latest_year : null;
-  r.is_fresh = typeof r.is_fresh === "boolean" ? r.is_fresh : false;
-  r.hq_city = typeof r.hq_city === "string" ? r.hq_city : null;
-
-  return r;
+// ---------- HELPERS ----------
+function isValidEmail(email) {
+  if (!email || typeof email !== "string") return false;
+  if (email.length > 100) return false;
+  return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-z]{2,}$/i.test(email);
 }
 
+function cleanString(v) {
+  return String(v || "").replace(/\s+/g, " ").trim();
+}
+
+function cleanArray(arr) {
+  if (!Array.isArray(arr)) return [];
+  return [...new Set(arr.filter(Boolean).map(v => cleanString(v)))];
+}
+
+// ---------- SOURCE RELIABILITY ----------
+function getSourceReliability(url) {
+  if (!url) return 30;
+  const u = String(url).toLowerCase();
+  
+  // Government
+  if (/\.gov(\.|$|\/)/.test(u) || /\.gov\.in/.test(u) || /\.nic\.in/.test(u)) return 100;
+  
+  // Academic
+  if (/\.edu(\.|$|\/)/.test(u) || /\.ac\.in/.test(u)) return 90;
+  
+  // Official company sites (no known directory)
+  if (!/crunchbase|dealroom|linkedin|twitter|facebook|wikipedia|medium|reddit|quora/i.test(u)) return 80;
+  
+  // Known directories
+  if (/crunchbase\.com/.test(u)) return 75;
+  if (/dealroom\.co/.test(u)) return 75;
+  if (/signal\.nfx\.com/.test(u)) return 75;
+  
+  // Social
+  if (/linkedin\.com/.test(u)) return 70;
+  if (/twitter\.com|x\.com/.test(u)) return 60;
+  
+  // News / Blog
+  if (/techcrunch|yourstory|inc42|entrackr|economictimes|livemint/i.test(u)) return 50;
+  if (/medium\.com|blogspot|wordpress\.com/i.test(u)) return 40;
+  
+  // Default
+  return 50;
+}
+
+// ---------- CONFIDENCE SCORING ----------
+function calculateConfidence(record) {
+  const breakdown = [];
+  let score = 0;
+
+  // 1. Source Reliability (max 30 points)
+  const sourceScore = getSourceReliability(record.source_url);
+  const sourceContribution = Math.round((sourceScore / 100) * 30);
+  score += sourceContribution;
+  breakdown.push({
+    factor: "source_reliability",
+    value: sourceScore,
+    contribution: sourceContribution,
+    max: 30
+  });
+
+  // 2. Contact Completeness (max 25 points)
+  let contactScore = 0;
+  if (record.emails && record.emails.length > 0) contactScore += 10;
+  if (record.linkedin && record.linkedin.length > 0) contactScore += 8;
+  if (record.phones && record.phones.length > 0) contactScore += 7;
+  const contactContribution = Math.min(25, contactScore);
+  score += contactContribution;
+  breakdown.push({
+    factor: "contact_completeness",
+    value: contactScore,
+    contribution: contactContribution,
+    max: 25
+  });
+
+  // 3. Cross-Source Count (max 20 points)
+  const sourceCount = (record.source_urls || [record.source_url]).filter(Boolean).length;
+  const crossContribution = Math.min(20, sourceCount * 7);
+  score += crossContribution;
+  breakdown.push({
+    factor: "cross_source_count",
+    value: sourceCount,
+    contribution: crossContribution,
+    max: 20
+  });
+
+  // 4. Email Verification Status (max 15 points)
+  const emailDetails = record.email_details || [];
+  let verificationScore = 0;
+  if (emailDetails.some(e => e.verified === true)) verificationScore = 15;
+  else if (emailDetails.some(e => e.source === "mailto" || e.source === "body")) verificationScore = 10;
+  else if (emailDetails.some(e => e.source === "pattern")) verificationScore = 5;
+  score += verificationScore;
+  breakdown.push({
+    factor: "email_verification",
+    value: verificationScore,
+    contribution: verificationScore,
+    max: 15
+  });
+
+  // 5. Field Richness (max 10 points)
+  let richnessScore = 0;
+  if (record.company_name && record.company_name.length > 2) richnessScore += 3;
+  if (record.region || record.hq_city) richnessScore += 3;
+  if (record.sectors && record.sectors.length > 0) richnessScore += 2;
+  if (record.description && record.description.length > 50) richnessScore += 2;
+  score += richnessScore;
+  breakdown.push({
+    factor: "field_richness",
+    value: richnessScore,
+    contribution: richnessScore,
+    max: 10
+  });
+
+  // Clamp score to 0-100
+  score = Math.max(0, Math.min(100, score));
+
+  // Assign confidence level
+  let level = "LOW";
+  if (score >= 70) level = "HIGH";
+  else if (score >= 45) level = "MEDIUM";
+
+  return {
+    confidence_score: score,
+    confidence: level,
+    confidence_breakdown: breakdown
+  };
+}
+
+// ---------- FRESHNESS SCORING ----------
+function calculateFreshness(record) {
+  const now = Date.now();
+  const lastVerified = record.last_verified_date 
+    ? new Date(record.last_verified_date).getTime()
+    : (record.discovery_date ? new Date(record.discovery_date).getTime() : now);
+  
+  const daysSince = Math.floor((now - lastVerified) / (1000 * 60 * 60 * 24));
+  
+  // Freshness drops 2 points per day, min 0
+  const freshnessScore = Math.max(0, 100 - (daysSince * 2));
+  
+  let freshnessLabel = "STALE";
+  if (freshnessScore >= 80) freshnessLabel = "FRESH";
+  else if (freshnessScore >= 50) freshnessLabel = "RECENT";
+  else if (freshnessScore >= 20) freshnessLabel = "OLD";
+  
+  return {
+    freshness_score: freshnessScore,
+    freshness_label: freshnessLabel,
+    days_since_verified: daysSince
+  };
+}
+
+// ---------- VALIDATE RECORD ----------
 function validateRecord(record) {
-  const cleaned = cleanRecord(record);
-  if (!cleaned) return null;
-  if (!cleaned.source_url || !cleaned.source_url.startsWith("http")) return null;
-  return cleaned;
+  if (!record || typeof record !== "object") {
+    return { valid: false, reason: "not an object" };
+  }
+
+  const cleaned = { ...record };
+
+  // Clean strings
+  cleaned.name = cleanString(record.name);
+  cleaned.company_name = cleanString(record.company_name);
+  cleaned.investor_type = cleanString(record.investor_type);
+  cleaned.region = cleanString(record.region);
+  cleaned.hq_city = record.hq_city ? cleanString(record.hq_city) : null;
+  cleaned.thesis = cleanString(record.thesis);
+  cleaned.description = cleanString(record.description);
+  cleaned.website = cleanString(record.website);
+  cleaned.source_url = cleanString(record.source_url);
+  cleaned.entity_type = cleanString(record.entity_type) || "investor";
+
+  // Clean arrays
+  cleaned.sectors = cleanArray(record.sectors);
+  cleaned.tags = cleanArray(record.tags);
+  cleaned.portfolio = cleanArray(record.portfolio);
+  cleaned.linkedin = cleanArray(record.linkedin);
+  cleaned.phones = cleanArray(record.phones);
+
+  // 🎯 Evidence URLs — deduplicate and clean
+  cleaned.source_urls = cleanArray(record.source_urls || [record.source_url]);
+
+  // Clean emails
+  let emails = [];
+  if (Array.isArray(record.emails)) {
+    emails = record.emails.filter(isValidEmail).map(e => e.toLowerCase());
+  } else if (typeof record.emails === "string") {
+    emails = record.emails.split(/[,\s;]+/).filter(isValidEmail).map(e => e.toLowerCase());
+  }
+  cleaned.emails = [...new Set(emails)];
+
+  // Email details
+  if (Array.isArray(record.email_details)) {
+    cleaned.email_details = record.email_details.filter(e => e && isValidEmail(e.email));
+  } else {
+    cleaned.email_details = cleaned.emails.map(e => ({
+      email: e, source: "unknown", weight: 3, score: 3
+    }));
+  }
+  cleaned.email_score = cleaned.email_details.reduce((sum, e) => sum + (e.score || 0), 0);
+
+  // LinkedIn details
+  if (Array.isArray(record.linkedin_details)) {
+    cleaned.linkedin_details = record.linkedin_details.filter(l => l && l.url);
+  } else {
+    cleaned.linkedin_details = cleaned.linkedin.map(u => ({ url: u, score: 3 }));
+  }
+  cleaned.linkedin_score = cleaned.linkedin_details.reduce((sum, l) => sum + (l.score || 0), 0);
+
+  // Numbers
+  cleaned.investor_score = Number(record.investor_score) || 0;
+  cleaned.status_code = Number(record.status_code) || null;
+  cleaned.latest_year = Number(record.latest_year) || null;
+
+  // Booleans
+  cleaned.is_fresh = Boolean(record.is_fresh);
+
+  // Dates
+  cleaned.discovery_date = record.discovery_date || new Date().toISOString();
+  cleaned.last_verified_date = record.last_verified_date || new Date().toISOString();
+
+  // 🎯 Calculate scores
+  const confidenceData = calculateConfidence(cleaned);
+  cleaned.confidence_score = confidenceData.confidence_score;
+  cleaned.confidence = confidenceData.confidence;
+  cleaned.confidence_breakdown = confidenceData.confidence_breakdown;
+
+  const freshnessData = calculateFreshness(cleaned);
+  cleaned.freshness_score = freshnessData.freshness_score;
+  cleaned.freshness_label = freshnessData.freshness_label;
+  cleaned.days_since_verified = freshnessData.days_since_verified;
+
+  // 🎯 Minimum requirement
+  const hasIdentifier = 
+    (cleaned.name && cleaned.name.length > 2) ||
+    (cleaned.company_name && cleaned.company_name.length > 2) ||
+    (cleaned.emails && cleaned.emails.length > 0);
+
+  if (!hasIdentifier) {
+    return { valid: false, reason: "no name/company/email" };
+  }
+
+  return { valid: true, record: cleaned };
 }
 
 function validateMany(records) {
+  if (!Array.isArray(records)) {
+    return { valid: [], invalidCount: 0 };
+  }
+
   const valid = [];
   let invalidCount = 0;
-  for (const r of records) {
-    const v = validateRecord(r);
-    if (v) valid.push(v);
-    else invalidCount++;
+
+  for (const record of records) {
+    const result = validateRecord(record);
+    if (result.valid) {
+      valid.push(result.record);
+    } else {
+      invalidCount++;
+    }
   }
+
   return { valid, invalidCount };
 }
 
-module.exports = { validateRecord, validateMany, cleanRecord };
+module.exports = { validateRecord, validateMany, isValidEmail, getSourceReliability };

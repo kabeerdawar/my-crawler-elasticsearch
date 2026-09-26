@@ -1,257 +1,1848 @@
-// crawler-playwright.js
-// Playwright-based crawler for JS-heavy government sites
-// Respects robots.txt + uses same extractor as main crawler
-// 🎯 Includes Gemini AI extraction fallback
-// 🛡️ FIX: Dialog handler + safe cleanup to prevent server crashes
+﻿// crawler-playwright.js
+// MyCrawler Browser Acquisition Engine
+// Browser acquisition -> raw evidence -> clean extraction -> quality gate
+
+"use strict";
 
 const { chromium } = require("playwright");
 const cheerio = require("cheerio");
 const axios = require("axios");
 const robotsParser = require("robots-parser");
-const { extractInvestorData, extractMultipleInvestors, extractPortfolioCompanies } = require("./extractor");
-const ai = require("./ai-helper");
+const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 
-const maxPagesPerSite = 40;
-const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-const robotsUserAgent = "InvestorCrawler/1.0";
+const {
+  extractInvestorData,
+  extractMultipleInvestors,
+  extractPortfolioCompanies,
+  extractGenericEntity
+} = require("./extractor");
 
-function cleanText(text) {
-  return String(text || "").replace(/\s+/g, " ").trim();
+// IMPORTANT:
+// Load AI lazily so this crawler has no module-level async dependency.
+let ai = null;
+
+function getAIHelper() {
+  if (!ai) {
+    ai = require("./ai-helper");
+  }
+
+  return ai;
 }
 
-// ---------- ROBOTS.TXT ----------
+// ============================================================
+// CONFIG
+// ============================================================
+
+const MAX_PAGES_PER_SITE = 30;
+const NAVIGATION_TIMEOUT = 45000;
+const NETWORK_IDLE_TIMEOUT = 8000;
+const MAX_NETWORK_RESPONSES = 100;
+const MAX_DISCOVERED_LINKS = 80;
+
+const USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+  "AppleWebKit/537.36 (KHTML, like Gecko) " +
+  "Chrome/120.0.0.0 Safari/537.36";
+
+const ROBOTS_USER_AGENT = "InvestorCrawler/2.0";
+
+const RAW_STORAGE_DIR = path.join(
+  process.cwd(),
+  "data",
+  "crawl-raw"
+);
+
+// ============================================================
+// BLACKLIST
+// ============================================================
+
+const DOMAIN_BLACKLIST = [
+  "linkedin.com",
+  "twitter.com",
+  "x.com",
+  "facebook.com",
+  "instagram.com",
+  "youtube.com",
+  "wikipedia.org",
+  "reddit.com",
+  "quora.com",
+  "medium.com",
+  "glassdoor.com",
+  "indeed.com",
+
+  "nasscom.in",
+  "cii.in",
+  "ficci.com",
+  "inc42.com",
+  "yourstory.com",
+  "techcrunch.com",
+  "entrackr.com",
+  "economictimes.indiatimes.com",
+  "livemint.com",
+  "business-standard.com",
+  "moneycontrol.com",
+  "vccircle.com",
+  "medianama.com",
+  "forbes.com",
+  "bloomberg.com",
+  "reuters.com",
+  "cnbc.com",
+
+  "justdial.com",
+  "indiamart.com",
+  "tradeindia.com",
+  "sulekha.com",
+  "practo.com",
+  "urbancompany.com",
+  "exportersindia.com"
+];
+
+// ============================================================
+// BASIC HELPERS
+// ============================================================
+
+function cleanText(value) {
+  return String(value || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeUrl(value) {
+  try {
+    const url = new URL(String(value));
+
+    url.hash = "";
+
+    const removeParams = [
+      "utm_source",
+      "utm_medium",
+      "utm_campaign",
+      "utm_term",
+      "utm_content",
+      "gclid",
+      "fbclid",
+      "mc_cid",
+      "mc_eid"
+    ];
+
+    for (const param of removeParams) {
+      url.searchParams.delete(param);
+    }
+
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+function getHostname(url) {
+  try {
+    return new URL(url).hostname
+      .replace(/^www\./i, "")
+      .toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function isBlacklisted(url) {
+  const host = getHostname(url);
+
+  if (!host) {
+    return false;
+  }
+
+  return DOMAIN_BLACKLIST.some(
+    domain =>
+      host === domain ||
+      host.endsWith("." + domain)
+  );
+}
+
+function sameDomain(a, b) {
+  const hostA = getHostname(a);
+  const hostB = getHostname(b);
+
+  return Boolean(hostA && hostB && hostA === hostB);
+}
+
+function contentHash(content) {
+  return crypto
+    .createHash("sha256")
+    .update(String(content || ""))
+    .digest("hex");
+}
+
+function safeFilename(value) {
+  return String(value || "")
+    .replace(/[^a-z0-9._-]/gi, "_")
+    .slice(0, 150);
+}
+
+function ensureRawStorage() {
+  fs.mkdirSync(
+    RAW_STORAGE_DIR,
+    {
+      recursive: true
+    }
+  );
+}
+
+// ============================================================
+// RAW EVIDENCE
+// ============================================================
+
+function saveRawEvidence({
+  url,
+  html,
+  networkResponses,
+  metadata
+}) {
+  try {
+    ensureRawStorage();
+
+    const hash = contentHash(html);
+
+    const timestamp =
+      new Date()
+        .toISOString()
+        .replace(/[:.]/g, "-");
+
+    const hostname =
+      safeFilename(
+        getHostname(url)
+      );
+
+    const filename =
+      `${timestamp}_${hostname}_${hash.slice(0, 12)}.json`;
+
+    const outputPath =
+      path.join(
+        RAW_STORAGE_DIR,
+        filename
+      );
+
+    const evidence = {
+      url,
+      crawled_at:
+        new Date().toISOString(),
+
+      content: {
+        hash,
+        size:
+          Buffer.byteLength(
+            String(html || ""),
+            "utf8"
+          ),
+        html
+      },
+
+      network_responses:
+        Array.isArray(networkResponses)
+          ? networkResponses
+          : [],
+
+      metadata:
+        metadata || {}
+    };
+
+    fs.writeFileSync(
+      outputPath,
+      JSON.stringify(
+        evidence,
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    return {
+      path: outputPath,
+      hash
+    };
+  } catch (error) {
+    console.error(
+      "Raw evidence storage failed:",
+      error.message
+    );
+
+    return {
+      path: null,
+      hash: contentHash(html)
+    };
+  }
+}
+
+// ============================================================
+// ROBOTS
+// ============================================================
+
 async function getRobots(startUrl) {
   try {
-    const parsed = new URL(startUrl);
-    const robotsUrl = `${parsed.protocol}//${parsed.hostname}/robots.txt`;
-    const res = await axios.get(robotsUrl, {
-      timeout: 10000,
-      headers: { "User-Agent": robotsUserAgent },
-      validateStatus: () => true
-    });
-    if (res.status >= 400) return null;
-    return robotsParser(robotsUrl, res.data);
-  } catch { return null; }
+    const parsed =
+      new URL(startUrl);
+
+    const robotsUrl =
+      `${parsed.protocol}//${parsed.hostname}/robots.txt`;
+
+    const response =
+      await axios.get(
+        robotsUrl,
+        {
+          timeout: 10000,
+          headers: {
+            "User-Agent":
+              ROBOTS_USER_AGENT
+          },
+          validateStatus:
+            () => true
+        }
+      );
+
+    if (response.status >= 400) {
+      return null;
+    }
+
+    return robotsParser(
+      robotsUrl,
+      response.data
+    );
+  } catch {
+    return null;
+  }
 }
 
+async function canCrawl(
+  robots,
+  url
+) {
+  if (!robots) {
+    return true;
+  }
+
+  try {
+    return robots.isAllowed(
+      url,
+      ROBOTS_USER_AGENT
+    ) !== false;
+  } catch {
+    return true;
+  }
+}
+
+// ============================================================
+// PAGE CLASSIFICATION
+// ============================================================
+
 function isTeamPage(url) {
-  const u = url.toLowerCase();
-  return /\/(team|people|our-team|our_team|leadership|leaders|partners|partner|management|founders|founder|about|about-us|about_us|who-we-are|whoweare|investors|investor|advisors|advisor|staff|principals|associates|directors|our-people|the-team|meet-the-team|network|members)/.test(u);
+  return /\/(team|people|leadership|partners|management|founders|about|investors|advisors|staff|directors|our-team|our-people)(\/|$)/i
+    .test(String(url || ""));
+}
+
+function isContactPage(url) {
+  return /\/(contact|contact-us|get-in-touch|reach-us|impressum)(\/|$)/i
+    .test(String(url || ""));
 }
 
 function isPortfolioPage(url) {
-  const u = url.toLowerCase();
-  return /\/(portfolio|companies|investments|backed|our-companies|funded|startups)/.test(u);
+  return /\/(portfolio|companies|investments|backed|our-companies|funded|startups)(\/|$)/i
+    .test(String(url || ""));
 }
 
-function getInvestorScore(url, text = "") {
-  const content = `${url} ${text}`.toLowerCase();
-  const strong = ["venture capital","private equity","family office","angel investor","angel investors","investment firm","investment fund","venture fund","portfolio companies","portfolio company","investment partner","managing partner","general partner"];
-  const medium = ["investor","investors","startup investment","startup investing","seed investment","seed funding","series a investment","series b investment","funding round","investment portfolio"];
+function isStrategyPage(url) {
+  return /\/(thesis|strategy|focus|what-we-invest-in|investment-strategy)(\/|$)/i
+    .test(String(url || ""));
+}
+
+function classifyPage(
+  url,
+  text
+) {
+  const u =
+    String(url || "")
+      .toLowerCase();
+
+  const t =
+    String(text || "")
+      .toLowerCase();
+
+  if (isTeamPage(u)) {
+    return "team";
+  }
+
+  if (isContactPage(u)) {
+    return "contact";
+  }
+
+  if (isPortfolioPage(u)) {
+    return "portfolio";
+  }
+
+  if (isStrategyPage(u)) {
+    return "strategy";
+  }
+
+  if (
+    /\/(fund|funds|fund-i|fund-ii|fund-iii)(\/|$)/i
+      .test(u) ||
+    t.includes("fund size")
+  ) {
+    return "fund";
+  }
+
+  if (
+    /\/(news|press|announcements|insights)(\/|$)/i
+      .test(u)
+  ) {
+    return "news";
+  }
+
+  if (
+    t.includes("venture capital") ||
+    t.includes("private equity") ||
+    t.includes("investment firm") ||
+    t.includes("angel investor") ||
+    t.includes("family office") ||
+    t.includes("portfolio companies")
+  ) {
+    return "investor";
+  }
+
+  return "general";
+}
+
+// ============================================================
+// CLEAN EXTRACTION DOM
+// ============================================================
+
+function buildCleanPage($) {
+  const html = $.html();
+
+  const clean =
+    cheerio.load(
+      html,
+      {
+        decodeEntities: true
+      }
+    );
+
+  clean(
+    [
+      "script",
+      "style",
+      "noscript",
+      "template",
+      "svg",
+      "iframe",
+      "canvas",
+
+      "nav",
+      "footer",
+      "header",
+      "aside",
+
+      "[role='navigation']",
+      "[role='banner']",
+      "[role='contentinfo']",
+
+      ".cookie",
+      ".cookies",
+      ".cookie-banner",
+      ".cookie-consent",
+
+      ".popup",
+      ".modal",
+      ".newsletter",
+
+      ".social",
+      ".share",
+      ".social-links",
+
+      ".navbar",
+      ".nav",
+      ".menu",
+      ".mobile-menu",
+
+      ".breadcrumb",
+      ".breadcrumbs",
+
+      ".advertisement",
+      ".advertisements",
+      ".ads",
+      ".ad"
+    ].join(",")
+  ).remove();
+
+  return clean;
+}
+
+function getSemanticText($) {
+  const clean =
+    buildCleanPage($);
+
+  const selectors = [
+    "main",
+    "[role='main']",
+    "article",
+    ".main-content",
+    ".page-content",
+    ".entry-content",
+    ".content"
+  ];
+
+  for (const selector of selectors) {
+    const node =
+      clean(selector).first();
+
+    if (!node.length) {
+      continue;
+    }
+
+    const text =
+      cleanText(
+        node.text()
+      );
+
+    if (text.length >= 200) {
+      return text;
+    }
+  }
+
+  return cleanText(
+    clean("body").text()
+  );
+}
+
+// ============================================================
+// CONTAMINATION DETECTION
+// ============================================================
+
+const NAVIGATION_WORDS = [
+  "open menu",
+  "log in",
+  "sign in",
+  "sign up",
+  "facebook",
+  "instagram",
+  "twitter",
+  "youtube",
+  "linkedin",
+  "newsletter",
+  "startup directory",
+  "founder directory",
+  "resources",
+  "apply"
+];
+
+function navigationContaminationScore(
+  value
+) {
+  const text =
+    String(value || "")
+      .toLowerCase();
+
+  if (!text) {
+    return 0;
+  }
+
   let score = 0;
-  for (const k of strong) if (content.includes(k)) score += 3;
-  for (const k of medium) if (content.includes(k)) score += 1;
+
+  for (const word of NAVIGATION_WORDS) {
+    if (text.includes(word)) {
+      score++;
+    }
+  }
+
   return score;
 }
 
-function isJunkPage(url, text) {
-  const u = url.toLowerCase();
-  if (/\/(login|signin|signup|register|cart|checkout)/.test(u)) return true;
-  const junkPaths = ["/privacy","/terms","/legal","/cookies","/careers","/jobs","/disclaimer","/gdpr"];
-  if (junkPaths.some(p => u.includes(p))) return true;
-  if (text.length < 200) return true;
+function isNavigationContaminated(
+  record
+) {
+  if (!record) {
+    return true;
+  }
+
+  const combined = [
+    record.name,
+    record.company_name,
+    record.description
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const score =
+    navigationContaminationScore(
+      combined
+    );
+
+  if (score >= 4) {
+    return true;
+  }
+
+  const company =
+    String(
+      record.company_name || ""
+    )
+      .toLowerCase();
+
+  if (
+    /facebook.*instagram.*linkedin/i
+      .test(company)
+  ) {
+    return true;
+  }
+
   return false;
 }
 
-function isNonHtmlFile(pathname) {
-  return /\.(pdf|docx?|xlsx?|pptx?|zip|rar|jpg|jpeg|png|gif|svg|mp4|mp3|avi|mov|webp|csv|json|xml)$/i.test(pathname);
+// ============================================================
+// RECORD CLEANING
+// ============================================================
+
+function cleanName(value) {
+  let text =
+    cleanText(value);
+
+  if (!text) {
+    return "";
+  }
+
+  text =
+    text
+      .replace(
+        /\b(open menu|log in|sign in|sign up|apply|newsletter)\b/gi,
+        " "
+      )
+      .replace(
+        /\b(facebook|instagram|twitter|youtube|linkedin)\b/gi,
+        " "
+      )
+      .replace(/\s+/g, " ")
+      .trim();
+
+  if (
+    /^(home|about|contact|portfolio|companies|team|people|resources|investors)$/i
+      .test(text)
+  ) {
+    return "";
+  }
+
+  if (
+    text.length > 120
+  ) {
+    return "";
+  }
+
+  return text;
 }
 
-// ---------- CRAWL SITE WITH PLAYWRIGHT ----------
-async function crawlSiteWithPlaywright(startUrl, allRecords, browser) {
-  let startDomain;
-  try { startDomain = new URL(startUrl).hostname; }
-  catch { return; }
+function cleanCompanyName(value) {
+  let text =
+    cleanText(value);
 
-  let robots = await getRobots(startUrl);
-  if (!robots) {
-    console.log(`  No robots.txt — crawling anyway`);
-    robots = { isAllowed: () => true };
-  }
-  if (!robots.isAllowed(startUrl, robotsUserAgent)) {
-    console.log(`  Blocked by robots.txt: ${startUrl}`);
-    return;
+  if (!text) {
+    return "";
   }
 
-  const context = await browser.newContext({
-    userAgent,
-    viewport: { width: 1366, height: 768 }
-  });
+  text =
+    text
+      .replace(
+        /\b(open menu|log in|sign in|sign up|apply|newsletter)\b/gi,
+        " "
+      )
+      .replace(
+        /\b(facebook|instagram|twitter|youtube|linkedin)\b/gi,
+        " "
+      )
+      .replace(/\s+/g, " ")
+      .trim();
 
-  const visited = new Set();
-  const queue = [startUrl];
-  console.log(`Starting (Playwright): ${startUrl}`);
+  if (
+    navigationContaminationScore(
+      text
+    ) >= 3
+  ) {
+    return "";
+  }
 
-  while (queue.length > 0 && visited.size < maxPagesPerSite) {
-    const url = queue.shift();
-    if (!url || visited.has(url)) continue;
+  if (
+    text.length > 160
+  ) {
+    return "";
+  }
 
-    if (!robots.isAllowed(url, robotsUserAgent)) {
-      console.log(`  Skipped (robots.txt): ${url}`);
+  return text;
+}
+
+function cleanDescription(value) {
+  let text =
+    cleanText(value);
+
+  if (!text) {
+    return "";
+  }
+
+  text =
+    text
+      .replace(
+        /\b(open menu|log in|sign in|sign up)\b/gi,
+        " "
+      )
+      .replace(/\s+/g, " ")
+      .trim();
+
+  if (
+    navigationContaminationScore(
+      text
+    ) >= 5
+  ) {
+    return "";
+  }
+
+  return text.slice(
+    0,
+    5000
+  );
+}
+
+function uniqueStrings(
+  values
+) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  const output = [];
+  const seen = new Set();
+
+  for (const value of values) {
+    const text =
+      cleanText(value);
+
+    if (!text) {
+      continue;
+    }
+
+    const key =
+      text.toLowerCase();
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    output.push(text);
+  }
+
+  return output;
+}
+
+function normalizeRecord(
+  record,
+  url,
+  entityType,
+  metadata = {}
+) {
+  const r =
+    record &&
+    typeof record === "object"
+      ? { ...record }
+      : {};
+
+  r.name =
+    cleanName(r.name);
+
+  r.company_name =
+    cleanCompanyName(
+      r.company_name
+    );
+
+  r.description =
+    cleanDescription(
+      r.description
+    );
+
+  r.sectors =
+    uniqueStrings(
+      r.sectors
+    );
+
+  r.tags =
+    uniqueStrings(
+      r.tags
+    );
+
+  r.stages =
+    uniqueStrings(
+      r.stages
+    );
+
+  r.portfolio =
+    uniqueStrings(
+      r.portfolio
+    );
+
+  r.emails =
+    uniqueStrings(
+      r.emails
+    );
+
+  r.linkedin =
+    uniqueStrings(
+      r.linkedin
+    );
+
+  r.phones =
+    uniqueStrings(
+      r.phones
+    );
+
+  r.source_urls =
+    uniqueStrings([
+      ...(Array.isArray(r.source_urls)
+        ? r.source_urls
+        : []),
+      r.source_url,
+      url
+    ]);
+
+  r.source_url =
+    r.source_url ||
+    url;
+
+  r.website =
+    r.website ||
+    url;
+
+  r.entity_type =
+    r.entity_type ||
+    entityType ||
+    "investor";
+
+  r.crawl_metadata = {
+    ...(r.crawl_metadata || {}),
+    ...metadata
+  };
+
+  r.extraction_version =
+    "3.0";
+
+  r.extracted_at =
+    new Date().toISOString();
+
+  if (
+    !r.confidence
+  ) {
+    if (
+      r.name &&
+      r.company_name
+    ) {
+      r.confidence = "HIGH";
+    } else if (
+      r.company_name ||
+      r.name
+    ) {
+      r.confidence = "MEDIUM";
+    } else {
+      r.confidence = "LOW";
+    }
+  }
+
+  return r;
+}
+
+// ============================================================
+// RECORD QUALITY
+// ============================================================
+
+function recordQuality(
+  record
+) {
+  if (!record) {
+    return {
+      valid: false,
+      score: 0
+    };
+  }
+
+  let score = 0;
+
+  if (
+    cleanName(record.name)
+  ) {
+    score += 3;
+  }
+
+  if (
+    cleanCompanyName(
+      record.company_name
+    )
+  ) {
+    score += 3;
+  }
+
+  if (
+    Array.isArray(record.sectors) &&
+    record.sectors.length
+  ) {
+    score += 1;
+  }
+
+  if (
+    Array.isArray(record.stages) &&
+    record.stages.length
+  ) {
+    score += 1;
+  }
+
+  if (
+    Array.isArray(record.emails) &&
+    record.emails.length
+  ) {
+    score += 2;
+  }
+
+  if (
+    Array.isArray(record.linkedin) &&
+    record.linkedin.length
+  ) {
+    score += 2;
+  }
+
+  if (
+    cleanDescription(
+      record.description
+    )
+  ) {
+    score += 1;
+  }
+
+  if (
+    isNavigationContaminated(
+      record
+    )
+  ) {
+    return {
+      valid: false,
+      score: 0,
+      reason:
+        "navigation_contamination"
+    };
+  }
+
+  if (
+    !record.source_url
+  ) {
+    return {
+      valid: false,
+      score,
+      reason:
+        "missing_source_url"
+    };
+  }
+
+  if (
+    !record.name &&
+    !record.company_name
+  ) {
+    return {
+      valid: false,
+      score,
+      reason:
+        "no_identity"
+    };
+  }
+
+  return {
+    valid: score >= 3,
+    score
+  };
+}
+
+// ============================================================
+// LINK DISCOVERY
+// ============================================================
+
+function linkPriority(
+  url,
+  anchorText
+) {
+  const value =
+    `${url} ${anchorText}`
+      .toLowerCase();
+
+  let score = 0;
+
+  const highValue = [
+    "team",
+    "people",
+    "partners",
+    "leadership",
+    "portfolio",
+    "companies",
+    "investments",
+    "thesis",
+    "strategy",
+    "about",
+    "contact"
+  ];
+
+  for (const word of highValue) {
+    if (value.includes(word)) {
+      score += 10;
+    }
+  }
+
+  const lowValue = [
+    "privacy",
+    "terms",
+    "cookie",
+    "login",
+    "signup",
+    "careers",
+    "press"
+  ];
+
+  for (const word of lowValue) {
+    if (value.includes(word)) {
+      score -= 10;
+    }
+  }
+
+  return score;
+}
+
+function discoverLinks(
+  $,
+  baseUrl
+) {
+  const results = [];
+  const seen = new Set();
+
+  $("a[href]").each(
+    (_, element) => {
+      if (
+        results.length >=
+        MAX_DISCOVERED_LINKS
+      ) {
+        return false;
+      }
+
+      const href =
+        $(element).attr(
+          "href"
+        );
+
+      const anchorText =
+        cleanText(
+          $(element).text()
+        );
+
+      if (!href) {
+        return;
+      }
+
+      try {
+        const absolute =
+          new URL(
+            href,
+            baseUrl
+          ).href;
+
+        const normalized =
+          normalizeUrl(
+            absolute
+          );
+
+        if (!normalized) {
+          return;
+        }
+
+        if (
+          !sameDomain(
+            normalized,
+            baseUrl
+          )
+        ) {
+          return;
+        }
+
+        if (
+          isBlacklisted(
+            normalized
+          )
+        ) {
+          return;
+        }
+
+        if (
+          !/^https?:\/\//i
+            .test(normalized)
+        ) {
+          return;
+        }
+
+        if (
+          seen.has(normalized)
+        ) {
+          return;
+        }
+
+        seen.add(normalized);
+
+        results.push({
+          url: normalized,
+          score:
+            linkPriority(
+              normalized,
+              anchorText
+            )
+        });
+      } catch {}
+    }
+  );
+
+  return results
+    .sort(
+      (a, b) =>
+        b.score - a.score
+    )
+    .slice(
+      0,
+      MAX_DISCOVERED_LINKS
+    )
+    .map(
+      item => item.url
+    );
+}
+
+// ============================================================
+// NETWORK CAPTURE
+// ============================================================
+
+function setupNetworkCapture(
+  page
+) {
+  const responses = [];
+
+  page.on(
+    "response",
+    async response => {
+      try {
+        if (
+          responses.length >=
+          MAX_NETWORK_RESPONSES
+        ) {
+          return;
+        }
+
+        const resourceType =
+          response.request()
+            .resourceType();
+
+        if (
+          ![
+            "xhr",
+            "fetch",
+            "document"
+          ].includes(
+            resourceType
+          )
+        ) {
+          return;
+        }
+
+        const status =
+          response.status();
+
+        if (
+          status < 200 ||
+          status >= 400
+        ) {
+          return;
+        }
+
+        let body = null;
+
+        try {
+          body =
+            await response.text();
+        } catch {
+          body = null;
+        }
+
+        responses.push({
+          url:
+            response.url(),
+          status,
+          resource_type:
+            resourceType,
+          content_type:
+            response.headers()[
+              "content-type"
+            ] || "",
+          body:
+            typeof body === "string"
+              ? body.slice(
+                  0,
+                  500000
+                )
+              : null
+        });
+      } catch {}
+    }
+  );
+
+  return responses;
+}
+
+// ============================================================
+// PAGE WAIT
+// ============================================================
+
+async function waitForUsefulPage(
+  page
+) {
+  try {
+    await page.waitForLoadState(
+      "domcontentloaded",
+      {
+        timeout:
+          NAVIGATION_TIMEOUT
+      }
+    );
+  } catch {}
+
+  try {
+    await page.waitForLoadState(
+      "networkidle",
+      {
+        timeout:
+          NETWORK_IDLE_TIMEOUT
+      }
+    );
+  } catch {}
+
+  try {
+    await page.waitForTimeout(
+      750
+    );
+  } catch {}
+}
+
+// ============================================================
+// DYNAMIC CONTENT
+// ============================================================
+
+async function detectDynamicContent(
+  page
+) {
+  try {
+    return await page.evaluate(
+      () => {
+        const body =
+          document.body;
+
+        const text =
+          body?.innerText ||
+          "";
+
+        return {
+          textLength:
+            text.length,
+
+          hasReact:
+            Boolean(
+              document.querySelector(
+                "[data-reactroot]"
+              )
+            ),
+
+          hasNext:
+            Boolean(
+              document.querySelector(
+                "#__next"
+              )
+            ),
+
+          hasVue:
+            Boolean(
+              document.querySelector(
+                "[data-v-app]"
+              )
+            )
+        };
+      }
+    );
+  } catch {
+    return {
+      textLength: 0,
+      hasReact: false,
+      hasNext: false,
+      hasVue: false
+    };
+  }
+}
+
+// ============================================================
+// EXTRACTION
+// ============================================================
+
+async function extractRecords(
+  extraction$,
+  url,
+  entityType,
+  pageClass
+) {
+  let records = [];
+
+  try {
+    if (
+      pageClass ===
+        "portfolio" &&
+      !isTeamPage(url)
+    ) {
+      records =
+        extractPortfolioCompanies(
+          extraction$,
+          url
+        );
+
+      if (
+        !Array.isArray(records) ||
+        records.length === 0
+      ) {
+        records = [
+          extractInvestorData(
+            extraction$,
+            url
+          )
+        ];
+      }
+    } else if (
+      pageClass === "team" ||
+      pageClass === "contact"
+    ) {
+      records =
+        extractMultipleInvestors(
+          extraction$,
+          url
+        );
+    } else if (
+      entityType === "investor"
+    ) {
+      records = [
+        extractInvestorData(
+          extraction$,
+          url
+        )
+      ];
+    } else {
+      records = [
+        extractGenericEntity(
+          extraction$,
+          url,
+          entityType
+        )
+      ];
+    }
+  } catch (error) {
+    console.error(
+      "Extraction error:",
+      error.message
+    );
+
+    records = [];
+  }
+
+  if (
+    !Array.isArray(records)
+  ) {
+    records = [
+      records
+    ];
+  }
+
+  return records;
+}
+
+// ============================================================
+// AI FALLBACK
+// ============================================================
+
+async function tryAIExtraction(
+  text,
+  url,
+  entityType
+) {
+  if (
+    !text ||
+    text.length < 150
+  ) {
+    return null;
+  }
+
+  try {
+    const helper =
+      getAIHelper();
+
+    if (
+      !helper ||
+      typeof helper.aiExtractEntity !==
+        "function"
+    ) {
+      return null;
+    }
+
+    const result =
+      await helper.aiExtractEntity(
+        text,
+        url,
+        entityType
+      );
+
+    if (
+      !result ||
+      typeof result !==
+        "object"
+    ) {
+      return null;
+    }
+
+    return result;
+  } catch (error) {
+    console.log(
+      "AI extraction skipped:",
+      error.message
+    );
+
+    return null;
+  }
+}
+
+// ============================================================
+// SINGLE SITE CRAWL
+// ============================================================
+
+async function crawlSiteWithPlaywright(
+  startUrl,
+  entityType,
+  browser
+) {
+  const normalizedStart =
+    normalizeUrl(
+      startUrl
+    );
+
+  if (
+    !normalizedStart
+  ) {
+    return [];
+  }
+
+  if (
+    isBlacklisted(
+      normalizedStart
+    )
+  ) {
+    return [];
+  }
+
+  const robots =
+    await getRobots(
+      normalizedStart
+    );
+
+  const context =
+    await browser.newContext({
+      userAgent: USER_AGENT,
+
+      viewport: {
+        width: 1440,
+        height: 900
+      },
+
+      ignoreHTTPSErrors: true
+    });
+
+  const visited =
+    new Set();
+
+  const queue = [
+    normalizedStart
+  ];
+
+  const allRecords = [];
+
+  while (
+    queue.length &&
+    visited.size <
+      MAX_PAGES_PER_SITE
+  ) {
+    const url =
+      queue.shift();
+
+    if (
+      visited.has(url)
+    ) {
       continue;
     }
 
     visited.add(url);
-    let page;
+
+    if (
+      !(await canCrawl(
+        robots,
+        url
+      ))
+    ) {
+      continue;
+    }
+
+    let page = null;
 
     try {
-      page = await context.newPage();
+      page =
+        await context.newPage();
 
-      // ============================================================
-      // 🛡️ CRITICAL FIX: Attach dialog handler immediately after page creation
-      // This prevents "Page.handleJavaScriptDialog: Not attached to an active page" crash
-      // ============================================================
-      page.on("dialog", async (dialog) => {
-        try {
-          console.log(`  [Popup] ${dialog.type()} on ${url} — dismissing`);
-          await dialog.dismiss();
-        } catch (err) {
-          // Dialog may already be gone (page navigated/closed). Ignore silently.
-        }
-      });
-
-      // Also catch page crashes to prevent unhandled errors
-      page.on("crash", () => {
-        console.log(`  [Crash] Page crashed: ${url}`);
-      });
-
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-      await page.waitForTimeout(1000);
-
-      // Scroll to trigger lazy content
-      try {
-        await page.evaluate(() => { window.scrollTo(0, document.body.scrollHeight / 2); });
-        await page.waitForTimeout(500);
-        await page.evaluate(() => { window.scrollTo(0, document.body.scrollHeight); });
-        await page.waitForTimeout(1000);
-      } catch {}
-
-      const html = await page.content();
-      const $ = cheerio.load(html);
-      const text = cleanText($("body").text());
-
-      if (isJunkPage(url, text)) {
-        continue; // finally block will close the page
-      }
-
-      const score = getInvestorScore(url, text);
-
-      if (score >= 2) {
-        let records;
-        if (isPortfolioPage(url) && !isTeamPage(url)) {
-          records = extractPortfolioCompanies($, url);
-          if (records.length === 0) records = [extractInvestorData($, url)];
-        } else if (isTeamPage(url)) {
-          records = extractMultipleInvestors($, url);
-        } else {
-          records = [extractInvestorData($, url)];
-        }
-
-        // 🎯 GEMINI AI EXTRACTION — if regex found nothing useful
-        const hasUsefulData = records.some(r =>
-          (r.emails && r.emails.length > 0) || (r.linkedin && r.linkedin.length > 0)
+      const networkResponses =
+        setupNetworkCapture(
+          page
         );
 
-        if (!hasUsefulData && text.length > 500 && ai.aiStatus().gemini) {
+      page.on(
+        "dialog",
+        async dialog => {
           try {
-            console.log(`  🤖 Gemini extracting: ${url}`);
-            const aiRecord = await ai.aiExtractInvestor(text, url);
-            if (aiRecord && (aiRecord.name || aiRecord.company_name || (aiRecord.emails && aiRecord.emails.length))) {
-              records = [{
-                name: aiRecord.name || "",
-                company_name: aiRecord.company_name || "",
-                investor_type: aiRecord.investor_type || "",
-                region: aiRecord.region || "",
-                hq_city: aiRecord.hq_city || null,
-                sectors: aiRecord.sectors || [],
-                tags: aiRecord.tags || [],
-                portfolio: aiRecord.portfolio || [],
-                thesis: aiRecord.thesis || "",
-                emails: aiRecord.emails || [],
-                email_details: (aiRecord.emails || []).map(e => ({ email: e, source: "gemini", weight: 8, score: 6 })),
-                email_score: 6,
-                linkedin: aiRecord.linkedin || [],
-                linkedin_details: (aiRecord.linkedin || []).map(u => ({ url: u, score: 5 })),
-                linkedin_score: 5,
-                phones: [],
-                latest_year: null,
-                is_fresh: false,
-                description: aiRecord.description || "",
-                website: url,
-                source_url: url,
-                investor_score: score,
-                crawl_type: "gemini_extracted"
-              }];
-              console.log(`  ✅ Gemini extracted: ${aiRecord.company_name || aiRecord.name || "record"}`);
-            }
-          } catch (err) {
-            console.log(`  Gemini extraction failed: ${err.message}`);
-          }
+            await dialog.dismiss();
+          } catch {}
         }
+      );
 
-        let kept = 0;
-        for (const record of records) {
-          const hasName = record.name && record.name.length > 2;
-          const hasCompany = record.company_name && record.company_name.length > 2;
-          const hasContact = (record.emails && record.emails.length > 0) || (record.linkedin && record.linkedin.length > 0);
-
-          const isPersonRecord = hasName && hasContact;
-          const isFirmRecord = hasCompany && !hasName;
-
-          if (isPersonRecord || isFirmRecord) {
-            record.investor_score = score;
-            record.crawl_type = (record.crawl_type || "general_page") + "_playwright";
-            allRecords.push(record);
-            kept++;
+      const response =
+        await page.goto(
+          url,
+          {
+            waitUntil:
+              "domcontentloaded",
+            timeout:
+              NAVIGATION_TIMEOUT
           }
-        }
-        if (kept > 0) console.log(`  KEPT (${kept}): ${url}`);
+        );
+
+      await waitForUsefulPage(
+        page
+      );
+
+      const statusCode =
+        response
+          ? response.status()
+          : null;
+
+      if (
+        statusCode &&
+        statusCode >= 400
+      ) {
+        await page.close();
+        continue;
       }
 
-      // Discover internal links
-      $("a").each((_, el) => {
-        const href = $(el).attr("href");
-        if (!href) return;
-        try {
-          const abs = new URL(href, url);
-          if (abs.protocol !== "http:" && abs.protocol !== "https:") return;
-          if (abs.hostname !== startDomain) return;
-          if (isNonHtmlFile(abs.pathname)) return;
-          abs.hash = "";
-          const clean = abs.href;
-          if (clean && !visited.has(clean) && !queue.includes(clean)) {
-            if (robots.isAllowed(clean, robotsUserAgent)) {
-              queue.push(clean);
-            }
-          }
-        } catch {}
-      });
+      // Small scroll to trigger lazy-loaded content.
+      try {
+        await page.evaluate(
+          async () => {
+            const height =
+              Math.min(
+                document.body?.scrollHeight ||
+                  0,
+                12000
+              );
 
-    } catch (err) {
-      if (!err.message.includes("Download is starting")) {
-        console.log(`  Failed ${url}: ${err.message}`);
+            window.scrollTo(
+              0,
+              height
+            );
+
+            await new Promise(
+              resolve =>
+                setTimeout(
+                  resolve,
+                  500
+                )
+            );
+          }
+        );
+      } catch {}
+
+      const html =
+        await page.content();
+
+      // RAW DOM:
+      // Used for link discovery.
+      const $ =
+        cheerio.load(
+          html
+        );
+
+      // CLEAN DOM:
+      // Used ONLY for extraction.
+      const extraction$ =
+        buildCleanPage(
+          $
+        );
+
+      const text =
+        getSemanticText(
+          extraction$
+        );
+
+      const pageClass =
+        classifyPage(
+          url,
+          text
+        );
+
+      const dynamicInfo =
+        await detectDynamicContent(
+          page
+        );
+
+      const evidence =
+        saveRawEvidence({
+          url,
+          html,
+          networkResponses,
+
+          metadata: {
+            status_code:
+              statusCode,
+
+            page_class:
+              pageClass,
+
+            entity_type:
+              entityType,
+
+            dynamic:
+              dynamicInfo
+          }
+        });
+
+      // ------------------------------------------------------
+      // EXTRACT
+      // ------------------------------------------------------
+
+      let records =
+        await extractRecords(
+          extraction$,
+          url,
+          entityType,
+          pageClass
+        );
+
+      // ------------------------------------------------------
+      // NORMALIZE + QUALITY
+      // ------------------------------------------------------
+
+      const normalizedRecords =
+        [];
+
+      for (
+        const rawRecord
+        of records
+      ) {
+        const record =
+          normalizeRecord(
+            rawRecord,
+            url,
+            entityType,
+            {
+              page_class:
+                pageClass,
+
+              status_code:
+                statusCode,
+
+              raw_evidence:
+                evidence.path,
+
+              content_hash:
+                evidence.hash
+            }
+          );
+
+        const quality =
+          recordQuality(
+            record
+          );
+
+        record.quality_score =
+          quality.score;
+
+        record.quality_reason =
+          quality.reason ||
+          null;
+
+        if (
+          quality.valid
+        ) {
+          normalizedRecords.push(
+            record
+          );
+        }
       }
-    } finally {
-      // ============================================================
-      // 🛡️ CRITICAL FIX: Always close page in finally, safely
-      // This prevents "Not attached to an active page" errors from crashing the server
-      // ============================================================
+
+      // ------------------------------------------------------
+      // AI FALLBACK
+      // ------------------------------------------------------
+
+      if (
+        normalizedRecords.length === 0 &&
+        text.length >= 200
+      ) {
+        const aiRecord =
+          await tryAIExtraction(
+            text,
+            url,
+            entityType
+          );
+
+        if (
+          aiRecord
+        ) {
+          const normalizedAI =
+            normalizeRecord(
+              aiRecord,
+              url,
+              entityType,
+              {
+                page_class:
+                  pageClass,
+
+                status_code:
+                  statusCode,
+
+                raw_evidence:
+                  evidence.path,
+
+                content_hash:
+                  evidence.hash,
+
+                extraction_method:
+                  "ai_fallback"
+              }
+            );
+
+          const quality =
+            recordQuality(
+              normalizedAI
+            );
+
+          normalizedAI.quality_score =
+            quality.score;
+
+          normalizedAI.quality_reason =
+            quality.reason ||
+            null;
+
+          if (
+            quality.valid
+          ) {
+            normalizedRecords.push(
+              normalizedAI
+            );
+          }
+        }
+      }
+
+      // ------------------------------------------------------
+      // FINAL RECORD METADATA
+      // ------------------------------------------------------
+
+      for (
+        const record
+        of normalizedRecords
+      ) {
+        record.crawl_type =
+          pageClass;
+
+        record.crawl_query =
+          record.crawl_query ||
+          null;
+
+        record.entity_type =
+          entityType;
+
+        record.status_code =
+          statusCode;
+
+        record.source_url =
+          record.source_url ||
+          url;
+
+        record.source_urls =
+          uniqueStrings([
+            ...(Array.isArray(
+              record.source_urls
+            )
+              ? record.source_urls
+              : []),
+            url
+          ]);
+      }
+
+      allRecords.push(
+        ...normalizedRecords
+      );
+
+      // ------------------------------------------------------
+      // LINK DISCOVERY
+      // ------------------------------------------------------
+
+      const links =
+        discoverLinks(
+          $,
+          url
+        );
+
+      for (
+        const link of links
+      ) {
+        if (
+          visited.has(link)
+        ) {
+          continue;
+        }
+
+        if (
+          queue.length >=
+          MAX_PAGES_PER_SITE
+        ) {
+          break;
+        }
+
+        queue.push(
+          link
+        );
+      }
+
+      await page.close();
+
+      page = null;
+    } catch (error) {
+      console.error(
+        `Playwright crawl failed for ${url}:`,
+        error.message
+      );
+
       if (page) {
         try {
-          await page.close({ runBeforeUnload: false });
-        } catch (closeErr) {
-          // Page may already be closed. Ignore.
-        }
+          await page.close();
+        } catch {}
       }
     }
   }
@@ -259,36 +1850,294 @@ async function crawlSiteWithPlaywright(startUrl, allRecords, browser) {
   try {
     await context.close();
   } catch {}
-  console.log(`Done (Playwright) ${startDomain} — pages: ${visited.size}`);
-}
-
-async function crawlSitesWithPlaywright(urls) {
-  const allRecords = [];
-  let browser;
-
-  try {
-    browser = await chromium.launch({ headless: true });
-
-    for (const url of urls) {
-      try {
-        await crawlSiteWithPlaywright(url, allRecords, browser);
-      } catch (err) {
-        console.log(`Site failed: ${url} — ${err.message}`);
-      }
-    }
-  } catch (fatalErr) {
-    console.error("Fatal Playwright error:", fatalErr.message);
-  } finally {
-    if (browser) {
-      try {
-        await browser.close();
-      } catch (e) {
-        console.error("Browser close error:", e.message);
-      }
-    }
-  }
 
   return allRecords;
 }
 
-module.exports = { crawlSitesWithPlaywright };
+// ============================================================
+// DEDUPLICATION
+// ============================================================
+
+function recordIdentity(
+  record
+) {
+  if (
+    record.linkedin &&
+    Array.isArray(record.linkedin) &&
+    record.linkedin[0]
+  ) {
+    return (
+      "linkedin:" +
+      record.linkedin[0]
+        .toLowerCase()
+    );
+  }
+
+  if (
+    record.emails &&
+    Array.isArray(record.emails) &&
+    record.emails[0]
+  ) {
+    return (
+      "email:" +
+      record.emails[0]
+        .toLowerCase()
+    );
+  }
+
+  const company =
+    cleanText(
+      record.company_name
+    )
+      .toLowerCase();
+
+  const name =
+    cleanText(
+      record.name
+    )
+      .toLowerCase();
+
+  if (
+    company &&
+    name
+  ) {
+    return (
+      `person:${name}:${company}`
+    );
+  }
+
+  if (company) {
+    return (
+      `company:${company}`
+    );
+  }
+
+  if (name) {
+    return (
+      `name:${name}`
+    );
+  }
+
+  return (
+    "source:" +
+    String(
+      record.source_url ||
+      ""
+    )
+  );
+}
+
+function mergeRecords(
+  existing,
+  incoming
+) {
+  const merged = {
+    ...existing
+  };
+
+  const arrayFields = [
+    "sectors",
+    "tags",
+    "stages",
+    "portfolio",
+    "emails",
+    "linkedin",
+    "phones",
+    "source_urls"
+  ];
+
+  for (
+    const field
+    of arrayFields
+  ) {
+    merged[field] =
+      uniqueStrings([
+        ...(Array.isArray(
+          existing[field]
+        )
+          ? existing[field]
+          : []),
+
+        ...(Array.isArray(
+          incoming[field]
+        )
+          ? incoming[field]
+          : [])
+      ]);
+  }
+
+  const scalarFields = [
+    "name",
+    "company_name",
+    "description",
+    "region",
+    "hq_city",
+    "investor_type",
+    "thesis",
+    "website",
+    "source_url"
+  ];
+
+  for (
+    const field
+    of scalarFields
+  ) {
+    if (
+      !merged[field] &&
+      incoming[field]
+    ) {
+      merged[field] =
+        incoming[field];
+    }
+  }
+
+  if (
+    Number(
+      incoming.quality_score || 0
+    ) >
+    Number(
+      merged.quality_score || 0
+    )
+  ) {
+    merged.quality_score =
+      incoming.quality_score;
+
+    merged.quality_reason =
+      incoming.quality_reason;
+  }
+
+  return merged;
+}
+
+function deduplicateRecords(
+  records
+) {
+  const map =
+    new Map();
+
+  for (
+    const record
+    of records
+  ) {
+    const key =
+      recordIdentity(
+        record
+      );
+
+    if (
+      !map.has(key)
+    ) {
+      map.set(
+        key,
+        record
+      );
+    } else {
+      map.set(
+        key,
+        mergeRecords(
+          map.get(key),
+          record
+        )
+      );
+    }
+  }
+
+  return Array.from(
+    map.values()
+  );
+}
+
+// ============================================================
+// MAIN PUBLIC API
+// ============================================================
+
+async function crawlSitesWithPlaywright(
+  urls,
+  entityType = "investor"
+) {
+  const cleanUrls =
+    Array.from(
+      new Set(
+        (Array.isArray(urls)
+          ? urls
+          : [urls]
+        )
+          .map(
+            normalizeUrl
+          )
+          .filter(Boolean)
+          .filter(
+            url =>
+              !isBlacklisted(
+                url
+              )
+          )
+      )
+    );
+
+  if (
+    cleanUrls.length === 0
+  ) {
+    return [];
+  }
+
+  let browser = null;
+
+  try {
+    browser =
+      await chromium.launch({
+        headless: true
+      });
+
+    const allRecords =
+      [];
+
+    for (
+      const url
+      of cleanUrls
+    ) {
+      try {
+        const records =
+          await crawlSiteWithPlaywright(
+            url,
+            entityType,
+            browser
+          );
+
+        allRecords.push(
+          ...records
+        );
+      } catch (error) {
+        console.error(
+          `Site crawl failed for ${url}:`,
+          error.message
+        );
+      }
+    }
+
+    return deduplicateRecords(
+      allRecords
+    );
+  } catch (error) {
+    console.error(
+      "Browser launch failed:",
+      error.message
+    );
+
+    return [];
+  } finally {
+    if (browser) {
+      try {
+        await browser.close();
+      } catch {}
+    }
+  }
+}
+
+// ============================================================
+// EXPORT
+// ============================================================
+
+module.exports = {
+  crawlSitesWithPlaywright
+};

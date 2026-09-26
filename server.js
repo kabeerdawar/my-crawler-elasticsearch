@@ -27,6 +27,9 @@ const { discoverSourcesFromQuery } = require("./discovery-search");
 const { saveInvestors, saveReviewQueue, getAllInvestors, isConfigured } = require("./db");
 const scheduler = require("./scheduler");
 const ai = require("./ai-helper");
+const { verifyEmails } = require("./email-verifier");
+const { resolveEntities } = require("./entity-resolver");
+const { calculateRecordConfidence } = require("./confidence-scorer");
 
 console.log('📦 All modules loaded');
 
@@ -34,6 +37,10 @@ const app = express();
 const PORT = 3000;
 
 const HISTORY_FILE = path.join(__dirname, "search-history.json");
+
+function unique(arr) {
+  return [...new Set(arr.filter(Boolean))];
+}
 
 function loadHistory() {
   try {
@@ -50,7 +57,9 @@ function saveHistory(entry) {
 
 const JS_HEAVY_SITES = [
   "startupindia.gov.in","sebi.gov.in","msme.gov.in","data.gov.in",
-  "esma.europa.eu","vcs.go.kr","northdata.com","dealroom.co","crunchbase.com"
+  "esma.europa.eu","vcs.go.kr","northdata.com","dealroom.co","crunchbase.com",
+  "fifty.vc","bharatinnovation.in","waterbridgeventures.com","ianfund.in",
+  "venturecatalysts.in","dexterangels.com","indianangelnetwork.com"
 ];
 
 function isJsHeavy(url) {
@@ -75,6 +84,7 @@ app.post("/discover", async (req, res) => {
   if (!raw) return res.status(400).json({ error: "Please enter a query." });
 
   let parsed = parseQuery(raw);
+  console.log(`🎯 Entity type: ${parsed.entityType} (${parsed.entityKeyword || "default"})`);
 
   if (!parsed.understood && ai.aiStatus().groq) {
     console.log("🤖 Trying Groq AI parser...");
@@ -88,6 +98,7 @@ app.post("/discover", async (req, res) => {
           sectors: aiParsed.sectors || [],
           stages: aiParsed.stages || [],
           investorTypes: aiParsed.investorTypes || [],
+          entityType: parsed.entityType || aiParsed.entityType || "investor",
           understood: true
         };
         console.log("✅ Groq parsed:", JSON.stringify(parsed));
@@ -124,6 +135,7 @@ app.post("/discover", async (req, res) => {
 
   res.json({
     query: raw, parsed,
+    entityType: parsed.entityType,
     totalConsidered: discovery.totalConsidered,
     totalMatched: allSources.length,
     seedMatched: seedSources.length,
@@ -133,20 +145,32 @@ app.post("/discover", async (req, res) => {
 });
 
 // ---------- CRAWL LOGIC ----------
-async function crawlUrls(cleanUrls, query) {
+async function crawlUrls(cleanUrls, query, entityType = "investor") {
   const staticUrls = cleanUrls.filter(u => !isJsHeavy(u));
   const jsUrls = cleanUrls.filter(u => isJsHeavy(u));
 
-  console.log(`Static: ${staticUrls.length}, JS-heavy: ${jsUrls.length}`);
+  console.log(`Static: ${staticUrls.length}, JS-heavy: ${jsUrls.length}, Entity: ${entityType}`);
 
   let rawRecords = [];
+
+  // 🎯 Step 1: Snippet records from discovery
+  const snippetRecords = global.__SNIPPET_RECORDS || [];
+  global.__SNIPPET_RECORDS = [];
+  if (snippetRecords.length > 0) {
+    console.log(`📋 Snippet records: ${snippetRecords.length}`);
+    rawRecords.push(...snippetRecords);
+  }
+
+  // 🎯 Step 2: Static crawl
   if (staticUrls.length > 0) {
-    const r = await crawlSites(staticUrls);
+    const r = await crawlSites(staticUrls, entityType);
     rawRecords.push(...r);
     console.log(`Static: ${r.length}`);
   }
+
+  // 🎯 Step 3: JS-heavy crawl
   if (jsUrls.length > 0) {
-    const r = await crawlSitesWithPlaywright(jsUrls);
+    const r = await crawlSitesWithPlaywright(jsUrls, entityType);
     rawRecords.push(...r);
     console.log(`JS-heavy: ${r.length}`);
   }
@@ -157,7 +181,7 @@ async function crawlUrls(cleanUrls, query) {
   console.log(`Valid: ${valid.length}, Invalid: ${invalidCount}`);
 
   let cleanedRecords = valid;
-  if (ai.aiStatus().gemini && valid.length > 0) {
+  if (ai.aiStatus().gemini && valid.length > 0 && valid.length <= 20) {
     console.log(`🤖 Cleaning first 10 records with Gemini...`);
     cleanedRecords = await Promise.all(
       valid.map(async (record, idx) => {
@@ -171,20 +195,89 @@ async function crawlUrls(cleanUrls, query) {
     console.log("✅ AI cleaning done");
   }
 
-  console.log("Running dedup...");
-  const { investors, reviewQueue } = await deduplicateInvestors(cleanedRecords);
+  // 🎯 ENTITY RESOLUTION (Union-Find graph clustering)
+  console.log("Running entity resolution...");
+  const resolvedRecords = await resolveEntities(cleanedRecords);
+
+  // 🎯 FIELD-LEVEL CONFIDENCE SCORING
+  for (const record of resolvedRecords) {
+    const conf = calculateRecordConfidence(record);
+    record.confidence_score = conf.score;
+    record.confidence = conf.level;
+    record.confidence_breakdown = conf.factors;
+    record.freshness_score = conf.freshness;
+  }
+
+  // Legacy dedup for review queue separation
+  const { investors, reviewQueue } = await deduplicateInvestors(resolvedRecords);
   console.log(`Investors: ${investors.length}, Review: ${reviewQueue.length}`);
   console.log(`HIGH: ${investors.filter(r => r.confidence === "HIGH").length}`);
 
-  // 🎯 CHANGE 1: Har record mein crawl_query save karo
+  // 🎯 SMTP VERIFICATION FOR PATTERN EMAILS
+  try {
+    const patternEmailsToVerify = [];
+    for (const record of investors) {
+      const patterns = (record.email_details || []).filter(e => e.source === "pattern");
+      patternEmailsToVerify.push(...patterns.map(e => e.email));
+    }
+
+    if (patternEmailsToVerify.length > 0 && patternEmailsToVerify.length <= 30) {
+      console.log(`📧 SMTP verifying ${patternEmailsToVerify.length} pattern emails...`);
+      const results = await verifyEmails(patternEmailsToVerify);
+      let validPatterns = 0;
+      let invalidPatterns = 0;
+      let catchAllPatterns = 0;
+
+      for (const record of investors) {
+        const keptEmails = [];
+        const newDetails = [];
+
+        for (const e of record.email_details || []) {
+          if (e.source === "pattern") {
+            const r = results.get(e.email.toLowerCase());
+            if (r?.verified) {
+              newDetails.push({ ...e, verified: true, status: r.status, score: 15, weight: 15 });
+              keptEmails.push(e.email);
+              validPatterns++;
+            } else if (r?.status === "invalid") {
+              invalidPatterns++;
+            } else if (r?.status === "catch_all") {
+              newDetails.push({ ...e, verified: null, status: "catch_all", score: 5, weight: 5 });
+              keptEmails.push(e.email);
+              catchAllPatterns++;
+            } else {
+              newDetails.push({ ...e, verified: null, status: r?.status || "unknown" });
+              keptEmails.push(e.email);
+            }
+          } else {
+            newDetails.push(e);
+            keptEmails.push(e.email);
+          }
+        }
+
+        record.email_details = newDetails;
+        record.emails = unique(keptEmails);
+        record.email_score = newDetails.reduce((s, e) => s + (e.score || 0), 0);
+      }
+
+      console.log(`📧 SMTP: ${validPatterns} verified, ${invalidPatterns} rejected, ${catchAllPatterns} catch-all`);
+    } else if (patternEmailsToVerify.length > 30) {
+      console.log(`📧 Skipping SMTP (${patternEmailsToVerify.length} emails, limit 30)`);
+    }
+  } catch (err) {
+    console.log(`📧 SMTP verification failed: ${err.message}`);
+  }
+
   const cleanQuery = String(query || "").trim();
   for (const record of investors) {
     record.crawl_query = cleanQuery;
+    record.entity_type = entityType;
   }
   for (const record of reviewQueue) {
     record.crawl_query = cleanQuery;
+    record.entity_type = entityType;
   }
-  console.log(`🏷️  Tagged ${investors.length} investors with query: "${cleanQuery}"`);
+  console.log(`🏷️  Tagged ${investors.length} records with query: "${cleanQuery}" [${entityType}]`);
 
   const seeds = loadSeedDomains();
   for (const record of investors) {
@@ -216,6 +309,7 @@ async function crawlUrls(cleanUrls, query) {
 
   saveHistory({
     query: query || "",
+    entityType: entityType,
     urls: cleanUrls,
     timestamp: new Date().toISOString(),
     rawCount: rawRecords.length,
@@ -230,8 +324,9 @@ async function crawlUrls(cleanUrls, query) {
 scheduler.setCrawler(async (urls, query) => {
   const cleanUrls = urls.map(u => String(u || "").trim()).filter(u => /^https?:\/\//i.test(u));
   if (cleanUrls.length === 0) return;
+  const parsed = parseQuery(query || "");
   console.log(`[scheduler] Auto-crawl: ${query || "urls"}`);
-  await crawlUrls(cleanUrls, query || "");
+  await crawlUrls(cleanUrls, query || "", parsed.entityType || "investor");
 });
 
 // ---------- POST /crawl ----------
@@ -242,10 +337,14 @@ app.post("/crawl", async (req, res) => {
   const cleanUrls = urls.map(u => String(u || "").trim()).filter(u => /^https?:\/\//i.test(u));
   if (cleanUrls.length === 0) return res.status(400).json({ error: "No valid URLs." });
 
+  const parsed = parseQuery(req.body.query || "");
+  const entityType = parsed.entityType || "investor";
+
   try {
-    const result = await crawlUrls(cleanUrls, req.body.query || "");
+    const result = await crawlUrls(cleanUrls, req.body.query || "", entityType);
     res.json({
       sitesCrawled: cleanUrls.length,
+      entityType: entityType,
       rawCount: result.rawRecords.length,
       validCount: result.valid.length,
       invalidCount: result.invalidCount,
@@ -273,10 +372,11 @@ app.get("/results", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ---------- GET /results/all (FILTERED BY QUERY) ----------
+// ---------- GET /results/all ----------
 app.get("/results/all", async (req, res) => {
   try {
     const queryFilter = String(req.query.query || "").trim().toLowerCase();
+    const entityFilter = String(req.query.entityType || "").trim().toLowerCase();
 
     let data = [];
     if (isConfigured()) {
@@ -287,18 +387,21 @@ app.get("/results/all", async (req, res) => {
       data = JSON.parse(fs.readFileSync(p, "utf8"));
     }
 
-    console.log(`🔍 /results/all filter="${queryFilter}" total_in_db=${data.length}`);
+    console.log(`🔍 /results/all query="${queryFilter}" entity="${entityFilter}" total=${data.length}`);
 
-    // 🎯 CHANGE 2: Filter logic
     if (queryFilter) {
       data = data.filter(r => {
         const rq = String(r.crawl_query || "").toLowerCase().trim();
         if (!rq) return false;
         return rq === queryFilter || rq.includes(queryFilter) || queryFilter.includes(rq);
       });
-      console.log(`   → matched ${data.length} records`);
     }
 
+    if (entityFilter) {
+      data = data.filter(r => String(r.entity_type || "investor").toLowerCase() === entityFilter);
+    }
+
+    console.log(`   → matched ${data.length}`);
     res.json({ count: data.length, results: data, source: isConfigured() ? "supabase" : "json" });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -373,7 +476,7 @@ app.post("/scheduler/run", async (req, res) => {
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
-    service: "Investor Discovery Crawler",
+    service: "Multi-Entity Discovery Crawler",
     supabase: isConfigured(),
     ai: ai.aiStatus()
   });
@@ -393,7 +496,7 @@ app.listen(PORT, () => {
   console.log('✅ Server is listening!');
   console.log("");
   console.log("================================");
-  console.log("  INVESTOR DISCOVERY CRAWLER");
+  console.log("  MYCRAWLER DATA ENGINE");
   console.log("================================");
   console.log(`Open:      http://localhost:${PORT}`);
   console.log(`Supabase:  ${isConfigured() ? "✅ Connected" : "⚠️  Not configured"}`);

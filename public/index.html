@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Investor Discovery</title>
+<title>Discovery Crawler</title>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: Arial, sans-serif; background: #f4f6fa; color: #172033; }
@@ -83,8 +83,8 @@
 
   <div class="top-bar">
     <div>
-      <h1>Investor Discovery</h1>
-      <p class="subtitle">Describe the investors you're looking for</p>
+      <h1>Discovery Crawler</h1>
+      <p class="subtitle">Search investors, wholesalers, suppliers, doctors, and more</p>
     </div>
     <div class="top-actions">
       <div class="toggle-wrap">
@@ -95,22 +95,23 @@
         </label>
         <span id="labelAll" class="toggle-label">🔍 This Search</span>
       </div>
-      <button class="reset-btn" onclick="resetCrawler()" id="resetBtn" title="Clears crawler tracker and history — data stays safe">🔄 Reset Crawler</button>
+      <button class="reset-btn" onclick="resetCrawler()" id="resetBtn" title="Clears crawler tracker and history">🔄 Reset Crawler</button>
     </div>
   </div>
 
   <div class="search-box">
     <div class="input-row">
-      <input id="queryInput" type="text" placeholder='What investors are you looking for? e.g. "100 investors in Delhi"' />
+      <input id="queryInput" type="text" placeholder='Try: "investors in Delhi", "wholesalers in Punjab", "doctors in Mumbai"' />
       <button id="discoverBtn" onclick="discover()">Find Sources</button>
       <button id="directUrlBtn" class="green" onclick="directCrawl()">Crawl URL Directly</button>
     </div>
     <div class="examples">
       Try:
       <span onclick="useExample('investors in Delhi')">investors in Delhi</span>
-      <span onclick="useExample('investors in San Francisco')">investors in San Francisco</span>
-      <span onclick="useExample('European investors')">European investors</span>
-      <span onclick="useExample('US AI seed investors')">US AI seed</span>
+      <span onclick="useExample('wholesalers in Punjab')">wholesalers in Punjab</span>
+      <span onclick="useExample('doctors in Mumbai')">doctors in Mumbai</span>
+      <span onclick="useExample('suppliers in Delhi')">suppliers in Delhi</span>
+      <span onclick="useExample('VCs in Berlin')">VCs in Berlin</span>
     </div>
     <div id="status" class="status"></div>
   </div>
@@ -138,7 +139,7 @@
 
   <div class="filters">
     <input id="searchInput" type="text" placeholder="Search results..." oninput="filterResults()" />
-    <select id="typeFilter" onchange="filterResults()"><option value="">All Investor Types</option></select>
+    <select id="typeFilter" onchange="filterResults()"><option value="">All Types</option></select>
     <select id="regionFilter" onchange="filterResults()"><option value="">All Regions</option></select>
     <select id="emailFilter" onchange="filterResults()">
       <option value="">All Records</option>
@@ -152,7 +153,7 @@
       <option value="MEDIUM">MEDIUM only</option>
     </select>
     <select id="sortFilter" onchange="filterResults()">
-      <option value="score">Sort: Investor Score</option>
+      <option value="score">Sort: Score</option>
       <option value="email">Sort: Email Score</option>
       <option value="linkedin">Sort: LinkedIn Score</option>
       <option value="combined">Sort: Combined Contact</option>
@@ -163,14 +164,14 @@
     <table>
       <thead>
         <tr>
-          <th>Name</th><th>Company</th><th>Investor Type</th><th>Region</th>
+          <th>Name</th><th>Company</th><th>Type</th><th>Region</th>
           <th>Sectors</th><th>Tags</th><th>Emails</th><th>LinkedIn</th>
-          <th>Investor Score</th><th>Email Score</th><th>LinkedIn Score</th>
+          <th>Phones</th><th>Score</th><th>Email Score</th><th>LinkedIn Score</th>
           <th>Confidence</th><th>Fresh</th><th>Source</th>
         </tr>
       </thead>
       <tbody id="resultsBody">
-        <tr><td colspan="14" class="empty">Enter a query above to discover investors.</td></tr>
+        <tr><td colspan="15" class="empty">Enter a query above to discover sources.</td></tr>
       </tbody>
     </table>
   </div>
@@ -179,7 +180,7 @@
 
 <script>
 // ============================================================
-// 🛡️ SAFE FETCH — prevents JSON parse errors on HTML responses
+// 🛡️ SAFE FETCH
 // ============================================================
 async function safeFetch(url, options = {}) {
     try {
@@ -260,7 +261,6 @@ async function reloadCurrentView() {
     return;
   }
 
-  // 🎯 "This Search" view — current query ke records filter karo
   const currentQuery = document.getElementById("queryInput").value.trim();
   status.textContent = currentQuery 
     ? `Loading records for "${currentQuery}"...` 
@@ -278,7 +278,7 @@ async function reloadCurrentView() {
     if (currentQuery) {
       status.textContent = `Showing ${allResults.length} records matching "${currentQuery}"`;
     } else {
-      status.textContent = `Showing ${allResults.length} total records (no filter)`;
+      status.textContent = `Showing ${allResults.length} total records`;
     }
     
     updateDashboard();
@@ -292,13 +292,8 @@ async function reloadCurrentView() {
 async function resetCrawler() {
   const confirmed = confirm(
     "🔄 Reset Crawler?\n\n" +
-    "This will:\n" +
-    "• Clear crawl tracker (next crawl visits all sites fresh)\n" +
-    "• Clear search history\n" +
-    "• Set flag: next crawl will show ALL records\n\n" +
-    "This will NOT:\n" +
-    "• ❌ Delete investor data from Supabase\n" +
-    "• ❌ Delete any saved records\n\n" +
+    "This will clear search history and crawler state.\n" +
+    "Investor data will NOT be deleted.\n\n" +
     "Continue?"
   );
   if (!confirmed) return;
@@ -314,7 +309,7 @@ async function resetCrawler() {
     newRecordsThisSession = [];
     hasCrawledThisSession = false;
     status.textContent =
-      `✅ Crawler reset — data preserved (${data.dataPreserved.investors} investors + ${data.dataPreserved.review} review still safe).`;
+      `✅ Crawler reset — data preserved (${data.dataPreserved.investors} records still safe).`;
   } catch (err) {
     status.textContent = "Error: " + err.message;
   } finally {
@@ -341,7 +336,8 @@ async function discover() {
     });
 
     discoveredSources = data.sources || [];
-    status.textContent = `Found ${discoveredSources.length} sources (${data.seedMatched || 0} seed + ${data.ddgMatched || 0} DDG).`;
+    const entityType = data.entityType || "investor";
+    status.textContent = `Found ${discoveredSources.length} sources for ${entityType} (${data.seedMatched || 0} seed + ${data.ddgMatched || 0} DDG).`;
     renderSources();
   } catch (err) {
     status.textContent = "Error: " + err.message;
@@ -372,10 +368,10 @@ async function directCrawl() {
     });
 
     hasCrawledThisSession = true;
-    newRecordsThisSession = data.newRecords || data.results || [];
+    newRecordsThisSession = data.results || [];
     allResults = data.results || [];
-    lastCrawlStats = { newCount: data.newCount || 0, updatedCount: data.updatedCount || 0 };
-    status.textContent = `Done — 🆕 ${data.newCount} new + ♻️ ${data.updatedCount} updated`;
+    lastCrawlStats = { newCount: data.results?.length || 0, updatedCount: 0 };
+    status.textContent = `Done — ${data.results?.length || 0} records`;
 
     document.getElementById("viewToggle").checked = false;
     currentView = "new";
@@ -441,16 +437,12 @@ async function crawlSelected(force = false) {
     });
 
     hasCrawledThisSession = true;
-    newRecordsThisSession = data.newRecords || data.results || [];
+    newRecordsThisSession = data.results || [];
     allResults = data.results || [];
-    lastCrawlStats = { newCount: data.newCount || 0, updatedCount: data.updatedCount || 0 };
+    lastCrawlStats = { newCount: data.uniqueCount || 0, updatedCount: 0 };
 
-    if (data.message) {
-      status.textContent = data.message;
-    } else {
-      const totalMsg = data.totalCount ? ` | 📚 Total in DB: ${data.totalCount}` : "";
-      status.textContent = `Done — 🆕 ${data.newCount} NEW + ♻️ ${data.updatedCount} updated${totalMsg}`;
-    }
+    const entityMsg = data.entityType ? ` [${data.entityType}]` : "";
+    status.textContent = `Done${entityMsg} — ${data.uniqueCount || 0} records found (${data.rawCount || 0} raw)`;
 
     document.getElementById("viewToggle").checked = false;
     currentView = "new";
@@ -478,17 +470,26 @@ function updateDashboard() {
 function populateFilters() {
   const typeFilter = document.getElementById("typeFilter");
   const regionFilter = document.getElementById("regionFilter");
-  typeFilter.innerHTML = '<option value="">All Investor Types</option>';
+  
+  const currentType = typeFilter.value;
+  const currentRegion = regionFilter.value;
+  
+  typeFilter.innerHTML = '<option value="">All Types</option>';
   regionFilter.innerHTML = '<option value="">All Regions</option>';
 
-  [...new Set(allResults.map(r => r.investor_type).filter(Boolean))]
-    .forEach(t => typeFilter.appendChild(new Option(t, t)));
+  // 🎯 Entity types — investor, wholesaler, doctor, etc.
+  const types = [...new Set(allResults.map(r => r.entity_type || r.investor_type).filter(Boolean))];
+  types.sort();
+  types.forEach(t => typeFilter.appendChild(new Option(t, t)));
 
-  const regionTags = [...new Set(
+  // Regions
+  const regions = [...new Set(
     allResults.map(r => r.hq_city ? `${r.region} (${r.hq_city})` : (r.region || "")).filter(Boolean)
   )].sort();
-
-  regionTags.forEach(tag => regionFilter.appendChild(new Option(tag, tag)));
+  regions.forEach(tag => regionFilter.appendChild(new Option(tag, tag)));
+  
+  if (currentType && types.includes(currentType)) typeFilter.value = currentType;
+  if (currentRegion && regions.includes(currentRegion)) regionFilter.value = currentRegion;
 }
 
 function filterResults() {
@@ -503,7 +504,7 @@ function filterResults() {
     const s = JSON.stringify(r).toLowerCase();
     const regionTag = r.hq_city ? `${r.region} (${r.hq_city})` : (r.region || "");
     const matchesSearch = !search || s.includes(search);
-    const matchesType = !type || r.investor_type === type;
+    const matchesType = !type || (r.entity_type === type) || (r.investor_type === type);
     const matchesRegion = !region || regionTag === region;
 
     let matchesEmail = true;
@@ -530,7 +531,7 @@ function renderResults(results) {
   const body = document.getElementById("resultsBody");
 
   if (results.length === 0) {
-    body.innerHTML = '<tr><td colspan="14" class="empty">No records. Run a crawl to see data.</td></tr>';
+    body.innerHTML = '<tr><td colspan="15" class="empty">No records. Run a crawl to see data.</td></tr>';
     return;
   }
 
@@ -558,6 +559,7 @@ function renderResults(results) {
         }).join("")
       : (r.linkedin || []).map(u => `<div><a href="${u}" target="_blank">Profile</a></div>`).join("") || "-";
 
+    const phones = (r.phones || []).map(p => `<div>${escapeHtml(p)}</div>`).join("") || "-";
     const source = r.source_url ? `<a href="${r.source_url}" target="_blank">Open</a>` : "-";
     const regionDisplay = r.hq_city
       ? `${escapeHtml(r.region || "-")} (${escapeHtml(r.hq_city)})`
@@ -575,12 +577,13 @@ function renderResults(results) {
       <tr>
         <td>${escapeHtml(r.name || "-")}</td>
         <td>${escapeHtml(r.company_name || "-")}</td>
-        <td>${escapeHtml(r.investor_type || "-")}</td>
+        <td>${escapeHtml(r.entity_type || r.investor_type || "-")}</td>
         <td>${regionDisplay}</td>
         <td>${escapeHtml((r.sectors || []).join(", ") || "-")}</td>
         <td>${escapeHtml((r.tags || []).join(", ") || "-")}</td>
         <td>${emails}</td>
         <td>${linkedin}</td>
+        <td>${phones}</td>
         <td>${r.investor_score ?? "-"}</td>
         <td>${r.email_score ?? 0}</td>
         <td>${r.linkedin_score ?? 0}</td>
@@ -593,30 +596,31 @@ function renderResults(results) {
 
 function downloadCSV() {
   if (allResults.length === 0) { alert("No results."); return; }
-  const headers = ["Name","Company","Investor Type","Region","City","Sectors","Tags","Emails","Email Score","LinkedIn","LinkedIn Score","Confidence","Fresh","Latest Year","Investor Score","Source","Crawl Query"];
+  const headers = ["Name","Company","Type","Region","City","Sectors","Tags","Emails","Email Score","LinkedIn","LinkedIn Score","Phones","Confidence","Fresh","Latest Year","Score","Source","Crawl Query","Entity Type"];
   const rows = allResults.map(r => [
-    r.name || "", r.company_name || "", r.investor_type || "", r.region || "", r.hq_city || "",
+    r.name || "", r.company_name || "", r.entity_type || r.investor_type || "", r.region || "", r.hq_city || "",
     (r.sectors || []).join("; "), (r.tags || []).join("; "),
     (r.emails || []).join("; "), r.email_score ?? 0,
     (r.linkedin || []).join("; "), r.linkedin_score ?? 0,
+    (r.phones || []).join("; "),
     r.confidence || "", r.is_fresh ? "yes" : "no", r.latest_year || "",
-    r.investor_score ?? "", r.source_url || "", r.crawl_query || ""
+    r.investor_score ?? "", r.source_url || "", r.crawl_query || "", r.entity_type || ""
   ]);
-  saveCSV(headers, rows, "investor-results.csv");
+  saveCSV(headers, rows, "discovery-results.csv");
 }
 
 function downloadEmailsCSV() {
   const withEmails = allResults.filter(r => r.emails && r.emails.length > 0);
   if (withEmails.length === 0) { alert("No emails."); return; }
-  const headers = ["Company","Investor Type","Region","City","Email","Verification","Source","Confidence","Source URL","Crawl Query"];
+  const headers = ["Company","Type","Region","City","Email","Verification","Source","Confidence","Source URL"];
   const rows = [];
   withEmails.forEach(r => {
     (r.email_details || r.emails.map(e => ({ email: e, source: "body" }))).forEach(e => {
       const verification = e.verified === true ? "VERIFIED" : e.verified === false ? "INVALID" : e.source === "pattern" ? "GUESS" : "UNVERIFIED";
-      rows.push([r.company_name || "", r.investor_type || "", r.region || "", r.hq_city || "", e.email, verification, e.source, r.confidence || "", r.source_url || "", r.crawl_query || ""]);
+      rows.push([r.company_name || "", r.entity_type || r.investor_type || "", r.region || "", r.hq_city || "", e.email, verification, e.source, r.confidence || "", r.source_url || ""]);
     });
   });
-  saveCSV(headers, rows, "investor-emails.csv");
+  saveCSV(headers, rows, "discovery-emails.csv");
 }
 
 function saveCSV(headers, rows, filename) {

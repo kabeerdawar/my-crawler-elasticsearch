@@ -1,144 +1,208 @@
 // queryParser.js
-const REGION_ALIASES = {
-  "usa":"USA","us":"USA","america":"USA","united states":"USA","american":"USA",
-  "india":"India","indian":"India","bharat":"India",
-  "uk":"UK","united kingdom":"UK","britain":"UK","england":"UK",
-  "europe":"Europe","european":"Europe","germany":"Europe","france":"Europe",
-  "netherlands":"Europe","spain":"Europe","italy":"Europe","sweden":"Europe","ireland":"Europe",
-  "middle east":"Middle_East","uae":"Middle_East","saudi":"Middle_East","israel":"Middle_East",
-  "southeast asia":"Southeast_Asia","singapore":"Southeast_Asia","indonesia":"Southeast_Asia",
-  "malaysia":"Southeast_Asia","thailand":"Southeast_Asia","vietnam":"Southeast_Asia",
-  "japan":"East_Asia","china":"East_Asia","korea":"East_Asia",
-  "latin america":"Latin_America","latam":"Latin_America","brazil":"Latin_America","mexico":"Latin_America",
-  "africa":"Africa","nigeria":"Africa","kenya":"Africa","south africa":"Africa","egypt":"Africa"
+// 🌍 Multi-Entity Query Parser — investors, wholesalers, suppliers, etc.
+
+const REGION_KEYWORDS = {
+  "USA": ["usa", "us", "united states", "america", "silicon valley", "bay area"],
+  "Canada": ["canada", "canadian", "toronto", "vancouver"],
+  "UK": ["uk", "united kingdom", "britain", "england", "london"],
+  "Europe": ["europe", "european", "eu"],
+  "Germany": ["germany", "german", "berlin", "munich"],
+  "France": ["france", "french", "paris"],
+  "Netherlands": ["netherlands", "dutch", "amsterdam"],
+  "India": ["india", "indian", "delhi", "mumbai", "bangalore", "bengaluru", "chennai", "hyderabad", "pune", "punjab", "gujarat", "kolkata", "chandigarh", "amritsar", "ludhiana", "jalandhar"],
+  "China": ["china", "chinese", "beijing", "shanghai"],
+  "Japan": ["japan", "japanese", "tokyo"],
+  "Korea": ["korea", "korean", "seoul"],
+  "Singapore": ["singapore"],
+  "SE Asia": ["southeast asia", "asean", "indonesia", "jakarta", "vietnam", "thailand", "philippines"],
+  "Middle East": ["middle east", "mena", "uae", "dubai", "saudi", "israel", "tel aviv"],
+  "Australia": ["australia", "sydney", "melbourne"],
+  "Brazil": ["brazil", "são paulo", "sao paulo"],
+  "Mexico": ["mexico", "mexico city"],
+  "Africa": ["africa", "african", "nigeria", "kenya", "lagos", "nairobi"],
+  "Global": ["global", "worldwide", "international"]
 };
 
-const SECTOR_ALIASES = {
-  "ai":"AI","artificial intelligence":"AI","machine learning":"AI","generative ai":"AI","genai":"AI",
-  "saas":"SaaS","software":"SaaS","software as a service":"SaaS",
-  "fintech":"FinTech","financial technology":"FinTech","payments":"FinTech",
-  "healthcare":"Healthcare","health tech":"Healthcare","healthtech":"Healthcare","biotech":"Healthcare",
-  "edtech":"EdTech","education":"EdTech",
-  "climate":"ClimateTech","climate tech":"ClimateTech","climatetech":"ClimateTech","cleantech":"ClimateTech",
-  "cybersecurity":"Cybersecurity","cyber security":"Cybersecurity",
-  "ecommerce":"ECommerce","e-commerce":"ECommerce","marketplace":"ECommerce",
-  "consumer":"Consumer",
-  "deep tech":"DeepTech","deeptech":"DeepTech",
-  "agritech":"AgriTech","agriculture":"AgriTech",
-  "mobility":"Mobility","ev":"Mobility",
-  "space":"SpaceTech","spacetech":"SpaceTech",
-  "msme":"MSME","small business":"MSME","sme":"MSME"
+const CITY_KEYWORDS = [
+  "delhi", "new delhi", "mumbai", "bangalore", "bengaluru", "chennai", "hyderabad", "pune", "kolkata", "punjab", "chandigarh", "amritsar", "ludhiana", "jalandhar",
+  "san francisco", "new york", "boston", "seattle", "austin",
+  "london", "manchester", "berlin", "munich", "paris", "amsterdam",
+  "tokyo", "seoul", "beijing", "shanghai", "singapore", "jakarta",
+  "dubai", "tel aviv", "sydney", "melbourne",
+  "são paulo", "sao paulo", "mexico city", "lagos", "nairobi"
+];
+
+const SECTOR_KEYWORDS = {
+  "AI": ["ai", "artificial intelligence", "machine learning", "ml"],
+  "Fintech": ["fintech", "payments", "banking", "lending"],
+  "HealthTech": ["healthtech", "medtech", "healthcare", "biotech"],
+  "SaaS": ["saas", "software"],
+  "E-commerce": ["ecommerce", "e-commerce", "retail", "marketplace"],
+  "EdTech": ["edtech", "education"],
+  "Climate": ["climate", "cleantech", "sustainability", "energy"],
+  "Crypto": ["crypto", "blockchain", "web3"],
+  "Gaming": ["gaming", "games"],
+  "Space": ["space", "spacetech", "aerospace"],
+  "Mobility": ["mobility", "transport", "logistics", "ev"],
+  "AgriTech": ["agritech", "agriculture", "foodtech", "farming"],
+  "DeepTech": ["deeptech", "robotics", "hardware", "semiconductor"],
+  "Cybersecurity": ["cybersecurity", "security", "infosec"]
 };
 
-const STAGE_ALIASES = {
-  "pre-seed":"Pre-Seed","preseed":"Pre-Seed","pre seed":"Pre-Seed",
-  "seed":"Seed",
-  "early stage":"Early Stage","early-stage":"Early Stage",
-  "series a":"Series A","series-a":"Series A",
-  "series b":"Series B","series-b":"Series B"
+const STAGE_KEYWORDS = {
+  "Pre-seed": ["pre-seed", "preseed", "pre seed"],
+  "Seed": ["seed", "seed stage", "early stage", "early-stage"],
+  "Series A": ["series a", "series-a"],
+  "Series B": ["series b", "series-b"],
+  "Growth": ["growth", "growth equity"]
 };
 
-const TYPE_ALIASES = {
-  "vc":"Venture Capital","venture capital":"Venture Capital",
-  "angel":"Angel Investor","angel investor":"Angel Investor","angels":"Angel Investor",
-  "family office":"Family Fund","family fund":"Family Fund",
-  "private equity":"Private Equity","pe":"Private Equity",
-  "hni":"HNI","high net worth":"HNI"
+const INVESTOR_TYPE_KEYWORDS = {
+  "VC": ["vc", "vcs", "venture capital", "venture fund"],
+  "Angel": ["angel", "angel investor", "angel investors"],
+  "Family Office": ["family office", "family offices"],
+  "Private Equity": ["private equity", "pe firm"],
+  "Corporate VC": ["corporate venture", "cvc"],
+  "Accelerator": ["accelerator", "incubator"]
 };
 
-const CITY_ALIASES = {
-  "san francisco":"San Francisco","sf":"San Francisco","bay area":"San Francisco","silicon valley":"San Francisco",
-  "new york":"New York","nyc":"New York","boston":"Boston","los angeles":"Los Angeles",
-  "austin":"Austin","seattle":"Seattle","chicago":"Chicago","denver":"Denver","miami":"Miami",
-  "washington dc":"Washington DC",
-  "delhi":"Delhi","new delhi":"Delhi","ncr":"Delhi","noida":"Delhi","gurgaon":"Delhi","gurugram":"Delhi",
-  "mumbai":"Mumbai","bombay":"Mumbai",
-  "bangalore":"Bangalore","bengaluru":"Bangalore",
-  "hyderabad":"Hyderabad","chennai":"Chennai","pune":"Pune",
-  "ahmedabad":"Ahmedabad","kolkata":"Kolkata","jaipur":"Jaipur","chandigarh":"Chandigarh",
-  "london":"London","manchester":"Manchester","edinburgh":"Edinburgh",
-  "berlin":"Berlin","munich":"Munich","paris":"Paris","amsterdam":"Amsterdam",
-  "stockholm":"Stockholm","dublin":"Dublin","madrid":"Madrid","barcelona":"Barcelona",
-  "dubai":"Dubai","abu dhabi":"Abu Dhabi","riyadh":"Riyadh","tel aviv":"Tel Aviv",
-  "singapore":"Singapore","jakarta":"Jakarta","kuala lumpur":"Kuala Lumpur","bangkok":"Bangkok",
-  "tokyo":"Tokyo","hong kong":"Hong Kong","shanghai":"Shanghai","seoul":"Seoul",
-  "sao paulo":"Sao Paulo","mexico city":"Mexico City","buenos aires":"Buenos Aires",
-  "lagos":"Lagos","nairobi":"Nairobi","cape town":"Cape Town"
+// 🎯 Multi-entity type detection
+const ENTITY_KEYWORDS = {
+  "investor": [
+    "investor", "investors", "vc", "vcs", "venture capital", "angel",
+    "angel investor", "fund", "funds", "private equity", "family office",
+    "seed fund", "capital"
+  ],
+  "wholesaler": [
+    "wholesaler", "wholesalers", "wholesale", "bulk supplier",
+    "bulk suppliers", "distributor", "distributors"
+  ],
+  "supplier": [
+    "supplier", "suppliers", "vendor", "vendors", "provider", "providers"
+  ],
+  "manufacturer": [
+    "manufacturer", "manufacturers", "factory", "factories",
+    "producer", "producers", "manufacturing"
+  ],
+  "exporter": [
+    "exporter", "exporters", "export house", "export company"
+  ],
+  "importer": [
+    "importer", "importers", "import house", "import company"
+  ],
+  "dealer": [
+    "dealer", "dealers", "retailer", "retailers", "shop", "store", "outlet"
+  ],
+  "service_provider": [
+    "doctor", "doctors", "lawyer", "lawyers", "advocate", "advocates",
+    "consultant", "consultants", "engineer", "engineers", "architect",
+    "accountant", "ca", "teacher", "tutor", "clinic", "hospital",
+    "salon", "gym", "restaurant", "hotel", "photographer"
+  ]
 };
 
-const CITY_TO_REGION = {
-  "San Francisco":"USA","New York":"USA","Boston":"USA","Los Angeles":"USA","Austin":"USA",
-  "Seattle":"USA","Chicago":"USA","Denver":"USA","Miami":"USA","Washington DC":"USA",
-  "Delhi":"India","Mumbai":"India","Bangalore":"India","Hyderabad":"India","Chennai":"India",
-  "Pune":"India","Ahmedabad":"India","Kolkata":"India","Jaipur":"India","Chandigarh":"India",
-  "London":"UK","Manchester":"UK","Edinburgh":"UK",
-  "Berlin":"Europe","Munich":"Europe","Paris":"Europe","Amsterdam":"Europe","Stockholm":"Europe",
-  "Dublin":"Europe","Madrid":"Europe","Barcelona":"Europe",
-  "Dubai":"Middle_East","Abu Dhabi":"Middle_East","Riyadh":"Middle_East","Tel Aviv":"Middle_East",
-  "Singapore":"Southeast_Asia","Jakarta":"Southeast_Asia","Kuala Lumpur":"Southeast_Asia","Bangkok":"Southeast_Asia",
-  "Tokyo":"East_Asia","Hong Kong":"East_Asia","Shanghai":"East_Asia","Seoul":"East_Asia",
-  "Sao Paulo":"Latin_America","Mexico City":"Latin_America","Buenos Aires":"Latin_America",
-  "Lagos":"Africa","Nairobi":"Africa","Cape Town":"Africa"
-};
-
-function normalize(text) {
-  return String(text || "").toLowerCase().replace(/[^\w\s\-\.]/g, " ").replace(/\s+/g, " ").trim();
+function extractNumber(query) {
+  const match = query.match(/\b(\d{1,4})\b/);
+  return match ? parseInt(match[1], 10) : null;
 }
 
-function findAliases(text, map) {
-  const hits = new Set();
-  for (const [alias, canonical] of Object.entries(map)) {
-    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`(^|\\s)${escaped}(\\s|$)`, "i");
-    if (pattern.test(text)) hits.add(canonical);
+function extractSectors(lower) {
+  const found = new Set();
+  for (const [sector, keywords] of Object.entries(SECTOR_KEYWORDS)) {
+    for (const k of keywords) {
+      if (lower.includes(k)) { found.add(sector); break; }
+    }
   }
-  return [...hits];
+  return [...found];
 }
 
-function findCity(text) {
-  const aliases = Object.keys(CITY_ALIASES).sort((a, b) => b.length - a.length);
-  for (const alias of aliases) {
-    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`(^|\\s)${escaped}(\\s|$)`, "i");
-    if (pattern.test(text)) return CITY_ALIASES[alias];
+function extractStages(lower) {
+  const found = new Set();
+  for (const [stage, keywords] of Object.entries(STAGE_KEYWORDS)) {
+    for (const k of keywords) {
+      if (lower.includes(k)) { found.add(stage); break; }
+    }
+  }
+  return [...found];
+}
+
+function extractInvestorTypes(lower) {
+  const found = new Set();
+  for (const [type, keywords] of Object.entries(INVESTOR_TYPE_KEYWORDS)) {
+    for (const k of keywords) {
+      if (lower.includes(k)) { found.add(type); break; }
+    }
+  }
+  return [...found];
+}
+
+function extractRegion(lower) {
+  for (const [region, keywords] of Object.entries(REGION_KEYWORDS)) {
+    for (const k of keywords) {
+      const regex = new RegExp(`\\b${k.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, "i");
+      if (regex.test(lower)) return region;
+    }
   }
   return null;
 }
 
+function extractCity(lower) {
+  for (const city of CITY_KEYWORDS) {
+    if (lower.includes(city)) {
+      return city.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    }
+  }
+  return null;
+}
+
+// 🎯 Entity type detection
+function detectEntityType(lower) {
+  // Check all types, return first match with most specific keyword
+  let bestMatch = null;
+  let bestLength = 0;
+  
+  for (const [type, keywords] of Object.entries(ENTITY_KEYWORDS)) {
+    for (const kw of keywords) {
+      const regex = new RegExp(`\\b${kw.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, "i");
+      if (regex.test(lower) && kw.length > bestLength) {
+        bestMatch = { type, keyword: kw };
+        bestLength = kw.length;
+      }
+    }
+  }
+  
+  return bestMatch || { type: "investor", keyword: null };
+}
+
 function parseQuery(raw) {
   const query = String(raw || "").trim();
-  const n = normalize(query);
+  const lower = query.toLowerCase();
 
-  const regions = findAliases(n, REGION_ALIASES);
-  const sectors = findAliases(n, SECTOR_ALIASES);
-  const stages = findAliases(n, STAGE_ALIASES);
-  const types = findAliases(n, TYPE_ALIASES);
-  const city = findCity(n);
+  const region = extractRegion(lower);
+  const city = extractCity(lower);
+  const sectors = extractSectors(lower);
+  const stages = extractStages(lower);
+  const investorTypes = extractInvestorTypes(lower);
+  const limit = extractNumber(query);
+  const entityType = detectEntityType(lower);
 
-  let cityRegion = null;
-  if (city && CITY_TO_REGION[city]) {
-    cityRegion = CITY_TO_REGION[city];
-    if (!regions.includes(cityRegion)) regions.unshift(cityRegion);
-  }
-
-  const hasInvestorWord = /\binvestor|\bvc\b|\bangel\b|\bfund\b/i.test(query);
-  const understood = regions.length + sectors.length + stages.length + types.length > 0;
-
-  if (!understood && hasInvestorWord) {
-    types.push("Venture Capital");
-    types.push("Angel Investor");
-  }
+  const understood = Boolean(
+    region || city || sectors.length || stages.length || 
+    investorTypes.length || entityType.keyword
+  );
 
   return {
     raw: query,
-    region: regions[0] || null,
-    city: city,
-    cityRegion: cityRegion,
-    allRegions: regions,
+    region: region || null,
+    city: city || null,
     sectors,
     stages,
-    investorTypes: types,
-    understood: understood || hasInvestorWord
+    investorTypes: investorTypes.length ? investorTypes : 
+      (entityType.type === "investor" ? ["VC"] : []),
+    limit: limit || 100,
+    entityType: entityType.type,
+    entityKeyword: entityType.keyword,
+    understood
   };
 }
 
