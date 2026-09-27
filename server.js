@@ -1,506 +1,507 @@
-// server.js
 require('dotenv').config();
-
-console.log('🚀 server.js starting...');
-
-process.on('uncaughtException', (err) => {
-    console.error('UNCAUGHT EXCEPTION! 💥 Server zinda hai...');
-    console.error(err.name, err.message);
-});
-
-process.on('unhandledRejection', (err) => {
-    console.error('UNHANDLED REJECTION! 💥 Server zinda hai...');
-    console.error(err.name, err.message);
-});
-
-const express = require("express");
-const fs = require("fs");
-const path = require("path");
-
-const { parseQuery } = require("./queryParser");
-const { discoverSources, loadSeedDomains } = require("./discovery");
-const { crawlSites } = require("./crawler");
-const { crawlSitesWithPlaywright } = require("./crawler-playwright");
-const { deduplicateInvestors } = require("./deduplicator");
-const { validateMany } = require("./schema");
-const { discoverSourcesFromQuery } = require("./discovery-search");
-const { saveInvestors, saveReviewQueue, getAllInvestors, isConfigured } = require("./db");
-const scheduler = require("./scheduler");
-const ai = require("./ai-helper");
-const { verifyEmails } = require("./email-verifier");
-const { resolveEntities } = require("./entity-resolver");
-const { calculateRecordConfidence } = require("./confidence-scorer");
-
-console.log('📦 All modules loaded');
+const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const { client, CONTACTS_INDEX } = require('./search/es-client');
+const adv = require('./search/advanced-search');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-const HISTORY_FILE = path.join(__dirname, "search-history.json");
+app.use(express.json({ limit: '10mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-function unique(arr) {
-  return [...new Set(arr.filter(Boolean))];
-}
-
-function loadHistory() {
-  try {
-    if (!fs.existsSync(HISTORY_FILE)) return [];
-    return JSON.parse(fs.readFileSync(HISTORY_FILE, "utf8"));
-  } catch { return []; }
-}
-
-function saveHistory(entry) {
-  const history = loadHistory();
-  history.unshift(entry);
-  fs.writeFileSync(HISTORY_FILE, JSON.stringify(history.slice(0, 100), null, 2));
-}
-
-const JS_HEAVY_SITES = [
-  "startupindia.gov.in","sebi.gov.in","msme.gov.in","data.gov.in",
-  "esma.europa.eu","vcs.go.kr","northdata.com","dealroom.co","crunchbase.com",
-  "fifty.vc","bharatinnovation.in","waterbridgeventures.com","ianfund.in",
-  "venturecatalysts.in","dexterangels.com","indianangelnetwork.com"
-];
-
-function isJsHeavy(url) {
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, "");
-    return JS_HEAVY_SITES.some(site => host === site || host.endsWith("." + site));
-  } catch { return false; }
-}
-
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
-
+// ==================== DEBUG LOGGER ====================
 app.use((req, res, next) => {
-  req.setTimeout(3600000);
-  res.setTimeout(3600000);
+  console.log(`[REQ] ${req.method} ${req.url}`);
   next();
 });
 
-// ---------- POST /discover ----------
-app.post("/discover", async (req, res) => {
-  const raw = String(req.body.query || "").trim();
-  if (!raw) return res.status(400).json({ error: "Please enter a query." });
-
-  let parsed = parseQuery(raw);
-  console.log(`🎯 Entity type: ${parsed.entityType} (${parsed.entityKeyword || "default"})`);
-
-  if (!parsed.understood && ai.aiStatus().groq) {
-    console.log("🤖 Trying Groq AI parser...");
-    try {
-      const aiParsed = await ai.aiParseQuery(raw);
-      if (aiParsed) {
-        parsed = {
-          raw,
-          region: aiParsed.region,
-          city: aiParsed.city,
-          sectors: aiParsed.sectors || [],
-          stages: aiParsed.stages || [],
-          investorTypes: aiParsed.investorTypes || [],
-          entityType: parsed.entityType || aiParsed.entityType || "investor",
-          understood: true
-        };
-        console.log("✅ Groq parsed:", JSON.stringify(parsed));
-      }
-    } catch (err) {
-      console.log("AI parse failed:", err.message);
-    }
-  }
-
-  const discovery = discoverSources(parsed);
-  const seedSources = discovery.sources;
-
-  let ddgSources = [];
-  try { ddgSources = await discoverSourcesFromQuery(parsed, 20); }
-  catch (err) { console.log("DDG discovery failed:", err.message); }
-
-  const seenDomains = new Set();
-  const allSources = [];
-
-  for (const s of seedSources) {
-    if (!seenDomains.has(s.domain)) { seenDomains.add(s.domain); allSources.push(s); }
-  }
-  for (const s of ddgSources) {
-    if (!seenDomains.has(s.host)) {
-      seenDomains.add(s.host);
-      allSources.push({
-        domain: s.host, url: s.url, type: "Unknown",
-        region: parsed.region || "", hq_city: null,
-        sectors: [], stages: [], score: 1,
-        reasons: ["discovered via DuckDuckGo"]
-      });
-    }
-  }
-
-  res.json({
-    query: raw, parsed,
-    entityType: parsed.entityType,
-    totalConsidered: discovery.totalConsidered,
-    totalMatched: allSources.length,
-    seedMatched: seedSources.length,
-    ddgMatched: ddgSources.length,
-    sources: allSources
-  });
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
 });
 
-// ---------- CRAWL LOGIC ----------
-async function crawlUrls(cleanUrls, query, entityType = "investor") {
-  const staticUrls = cleanUrls.filter(u => !isJsHeavy(u));
-  const jsUrls = cleanUrls.filter(u => isJsHeavy(u));
+// ==================== LOAD SEEDS ====================
+const SEED_FILE = path.join(__dirname, 'data', 'seed-domains.json');
+let seedDomains = [];
 
-  console.log(`Static: ${staticUrls.length}, JS-heavy: ${jsUrls.length}, Entity: ${entityType}`);
-
-  let rawRecords = [];
-
-  // 🎯 Step 1: Snippet records from discovery
-  const snippetRecords = global.__SNIPPET_RECORDS || [];
-  global.__SNIPPET_RECORDS = [];
-  if (snippetRecords.length > 0) {
-    console.log(`📋 Snippet records: ${snippetRecords.length}`);
-    rawRecords.push(...snippetRecords);
-  }
-
-  // 🎯 Step 2: Static crawl
-  if (staticUrls.length > 0) {
-    const r = await crawlSites(staticUrls, entityType);
-    rawRecords.push(...r);
-    console.log(`Static: ${r.length}`);
-  }
-
-  // 🎯 Step 3: JS-heavy crawl
-  if (jsUrls.length > 0) {
-    const r = await crawlSitesWithPlaywright(jsUrls, entityType);
-    rawRecords.push(...r);
-    console.log(`JS-heavy: ${r.length}`);
-  }
-
-  console.log(`Raw total: ${rawRecords.length}`);
-
-  const { valid, invalidCount } = validateMany(rawRecords);
-  console.log(`Valid: ${valid.length}, Invalid: ${invalidCount}`);
-
-  let cleanedRecords = valid;
-  if (ai.aiStatus().gemini && valid.length > 0 && valid.length <= 20) {
-    console.log(`🤖 Cleaning first 10 records with Gemini...`);
-    cleanedRecords = await Promise.all(
-      valid.map(async (record, idx) => {
-        if (idx >= 10) return record;
-        try {
-          const cleaned = await ai.aiCleanRecord(record);
-          return { ...record, ...cleaned };
-        } catch { return record; }
-      })
-    );
-    console.log("✅ AI cleaning done");
-  }
-
-  // 🎯 ENTITY RESOLUTION (Union-Find graph clustering)
-  console.log("Running entity resolution...");
-  const resolvedRecords = await resolveEntities(cleanedRecords);
-
-  // 🎯 FIELD-LEVEL CONFIDENCE SCORING
-  for (const record of resolvedRecords) {
-    const conf = calculateRecordConfidence(record);
-    record.confidence_score = conf.score;
-    record.confidence = conf.level;
-    record.confidence_breakdown = conf.factors;
-    record.freshness_score = conf.freshness;
-  }
-
-  // Legacy dedup for review queue separation
-  const { investors, reviewQueue } = await deduplicateInvestors(resolvedRecords);
-  console.log(`Investors: ${investors.length}, Review: ${reviewQueue.length}`);
-  console.log(`HIGH: ${investors.filter(r => r.confidence === "HIGH").length}`);
-
-  // 🎯 SMTP VERIFICATION FOR PATTERN EMAILS
+function loadSeeds() {
   try {
-    const patternEmailsToVerify = [];
-    for (const record of investors) {
-      const patterns = (record.email_details || []).filter(e => e.source === "pattern");
-      patternEmailsToVerify.push(...patterns.map(e => e.email));
-    }
-
-    if (patternEmailsToVerify.length > 0 && patternEmailsToVerify.length <= 30) {
-      console.log(`📧 SMTP verifying ${patternEmailsToVerify.length} pattern emails...`);
-      const results = await verifyEmails(patternEmailsToVerify);
-      let validPatterns = 0;
-      let invalidPatterns = 0;
-      let catchAllPatterns = 0;
-
-      for (const record of investors) {
-        const keptEmails = [];
-        const newDetails = [];
-
-        for (const e of record.email_details || []) {
-          if (e.source === "pattern") {
-            const r = results.get(e.email.toLowerCase());
-            if (r?.verified) {
-              newDetails.push({ ...e, verified: true, status: r.status, score: 15, weight: 15 });
-              keptEmails.push(e.email);
-              validPatterns++;
-            } else if (r?.status === "invalid") {
-              invalidPatterns++;
-            } else if (r?.status === "catch_all") {
-              newDetails.push({ ...e, verified: null, status: "catch_all", score: 5, weight: 5 });
-              keptEmails.push(e.email);
-              catchAllPatterns++;
-            } else {
-              newDetails.push({ ...e, verified: null, status: r?.status || "unknown" });
-              keptEmails.push(e.email);
-            }
-          } else {
-            newDetails.push(e);
-            keptEmails.push(e.email);
-          }
-        }
-
-        record.email_details = newDetails;
-        record.emails = unique(keptEmails);
-        record.email_score = newDetails.reduce((s, e) => s + (e.score || 0), 0);
-      }
-
-      console.log(`📧 SMTP: ${validPatterns} verified, ${invalidPatterns} rejected, ${catchAllPatterns} catch-all`);
-    } else if (patternEmailsToVerify.length > 30) {
-      console.log(`📧 Skipping SMTP (${patternEmailsToVerify.length} emails, limit 30)`);
-    }
+    const raw = fs.readFileSync(SEED_FILE, 'utf-8');
+    const cleaned = '[' + raw.replace(/^\s*\[/, '').replace(/\]\s*$/, '') + ']';
+    seedDomains = JSON.parse(cleaned);
+    console.log(`Loaded ${seedDomains.length} seed domains`);
   } catch (err) {
-    console.log(`📧 SMTP verification failed: ${err.message}`);
+    console.error('Seed load failed:', err.message);
   }
+}
+loadSeeds();
 
-  const cleanQuery = String(query || "").trim();
-  for (const record of investors) {
-    record.crawl_query = cleanQuery;
-    record.entity_type = entityType;
+// ==================== DDG ====================
+async function searchDDG(query) {
+  try {
+    const { search } = require('duck-duck-scrape');
+    await new Promise(r => setTimeout(r, 2000 + Math.random() * 3000));
+    const results = await search(query, { safeSearch: 0 });
+    return (results.results || []).slice(0, 15).map(r => ({
+      title: r.title, url: r.url,
+      domain: extractDomain(r.url),
+      description: r.description || '',
+      source: 'ddg',
+    }));
+  } catch (err) {
+    console.error('[DDG]', err.message);
+    return [];
   }
-  for (const record of reviewQueue) {
-    record.crawl_query = cleanQuery;
-    record.entity_type = entityType;
-  }
-  console.log(`🏷️  Tagged ${investors.length} records with query: "${cleanQuery}" [${entityType}]`);
-
-  const seeds = loadSeedDomains();
-  for (const record of investors) {
-    try {
-      const recordDomain = new URL(record.source_url).hostname.replace(/^www\./, "");
-      for (const seed of seeds) {
-        const seedDomain = seed.domain.replace(/^www\./, "").split("/")[0];
-        if (recordDomain === seedDomain || recordDomain.endsWith("." + seedDomain)) {
-          record.hq_city = record.hq_city || seed.hq_city || null;
-          record.cities = seed.cities || [];
-          break;
-        }
-      }
-    } catch {}
-  }
-
-  fs.writeFileSync(path.join(__dirname, "crawl-results.json"), JSON.stringify(investors, null, 2));
-  fs.writeFileSync(path.join(__dirname, "review-queue.json"), JSON.stringify(reviewQueue, null, 2));
-
-  if (isConfigured()) {
-    try {
-      const invR = await saveInvestors(investors);
-      const revR = await saveReviewQueue(reviewQueue);
-      console.log(`Supabase: ${invR.saved} investors + ${revR.saved} review saved`);
-    } catch (e) {
-      console.error("Supabase save failed:", e.message);
-    }
-  }
-
-  saveHistory({
-    query: query || "",
-    entityType: entityType,
-    urls: cleanUrls,
-    timestamp: new Date().toISOString(),
-    rawCount: rawRecords.length,
-    uniqueCount: investors.length,
-    highCount: investors.filter(r => r.confidence === "HIGH").length,
-    emailCount: investors.filter(r => r.emails && r.emails.length > 0).length
-  });
-
-  return { rawRecords, valid, invalidCount, investors, reviewQueue };
 }
 
-scheduler.setCrawler(async (urls, query) => {
-  const cleanUrls = urls.map(u => String(u || "").trim()).filter(u => /^https?:\/\//i.test(u));
-  if (cleanUrls.length === 0) return;
-  const parsed = parseQuery(query || "");
-  console.log(`[scheduler] Auto-crawl: ${query || "urls"}`);
-  await crawlUrls(cleanUrls, query || "", parsed.entityType || "investor");
-});
+function extractDomain(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch (e) { return null; }
+}
 
-// ---------- POST /crawl ----------
-app.post("/crawl", async (req, res) => {
-  const urls = Array.isArray(req.body.urls) ? req.body.urls : [];
-  if (urls.length === 0) return res.status(400).json({ error: "No URLs provided." });
+// ==================== TIMEOUT ====================
+function withTimeout(promise, ms, label = 'op') {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timeout`)), ms)),
+  ]);
+}
 
-  const cleanUrls = urls.map(u => String(u || "").trim()).filter(u => /^https?:\/\//i.test(u));
-  if (cleanUrls.length === 0) return res.status(400).json({ error: "No valid URLs." });
+// ==================== CRAWLER ====================
+async function crawlUrlsInBackground(urls) {
+  const { chromium } = require('playwright');
+  const { extractFromText } = require('./extract/multi-field-extractor');
+  const { resolveCompany } = require('./extract/entity-resolver');
+  const enricher = require('./extract/enricher');
+  const indexer = require('./search/indexer');
 
-  const parsed = parseQuery(req.body.query || "");
-  const entityType = parsed.entityType || "investor";
+  const COMMON_PATHS = ['', '/contact', '/team', '/about'];
+  const DOMAIN_TIMEOUT = 25000;
+  const PAGE_TIMEOUT = 5000;
+
+  function isValidEmail(email) {
+    if (!email || typeof email !== 'string') return false;
+    const lower = email.toLowerCase().trim();
+    if (!/^[a-z0-9][a-z0-9._%+-]*@[a-z0-9][a-z0-9.-]*\.[a-z]{2,6}$/.test(lower)) return false;
+    const domain = lower.split('@')[1];
+    const parts = domain.split('.');
+    if (parts.length < 2 || parts.length > 3) return false;
+    const tld = parts[parts.length - 1];
+    const validTLDs = ['com','org','net','io','co','ai','vc','in','uk','de','fr','br','us','eu','app','dev','xyz'];
+    if (!validTLDs.includes(tld)) return false;
+    if (domain.endsWith('.for') || domain.endsWith('.we') || domain.endsWith('.ian')) return false;
+    if (/\.(mp|webm|mp4|mov|png|jpg|jpeg|gif|svg|webp|ico|css|js)$/i.test(lower)) return false;
+    if (/@2x|@3x|\d+x\./i.test(lower)) return false;
+    if (/\b(logo|favicon|sprite|icon|banner|hero|image)\b/i.test(lower)) return false;
+    if (/\d{4,}/.test(lower)) return false;
+    const local = lower.split('@')[0];
+    if (local.length > 30 || !/[aeiou]/i.test(local)) return false;
+    return true;
+  }
+
+  let browser = null;
+
+  async function processOneDomain(rawUrl) {
+    const url = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
+    const domain = new URL(url).hostname.replace(/^www\./, '');
+    console.log(`  [crawl] ${domain}`);
+
+    const allEmails = new Set();
+    const allPhones = new Set();
+    let bestHtml = '';
+    let bestText = '';
+    let bestExtracted = {};
+
+    let context = null, page = null;
+
+    try {
+      context = await browser.newContext({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      });
+      page = await context.newPage();
+
+      await page.route('**/*', (route) => {
+        const type = route.request().resourceType();
+        if (['image', 'media', 'font', 'stylesheet'].includes(type)) return route.abort();
+        return route.continue();
+      });
+
+      for (const p of COMMON_PATHS) {
+        try {
+          await withTimeout(
+            page.goto(`${url.replace(/\/$/, '')}${p}`, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT }),
+            PAGE_TIMEOUT + 2000,
+            `goto ${p}`
+          );
+          await page.waitForTimeout(300);
+
+          const html = await withTimeout(page.content(), 3000, 'content');
+          const text = await withTimeout(page.evaluate(() => document.body.innerText), 3000, 'evaluate');
+
+          const extracted = extractFromText(text);
+
+          let mailtoEmails = [];
+          try {
+            mailtoEmails = await withTimeout(
+              page.evaluate(() => {
+                const links = Array.from(document.querySelectorAll('a[href^="mailto:"]'));
+                return links.map((a) => {
+                  try { return decodeURIComponent(a.href.replace('mailto:', '').split('?')[0]).toLowerCase().trim(); }
+                  catch (e) { return a.href.replace('mailto:', '').split('?')[0].toLowerCase().trim(); }
+                });
+              }),
+              2000, 'mailto'
+            );
+          } catch (e) { mailtoEmails = []; }
+
+          const htmlEmails = (html.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}/g) || []).map((e) => e.toLowerCase().trim());
+
+          [...extracted.emails, ...mailtoEmails, ...htmlEmails].forEach((e) => {
+            if (isValidEmail(e)) allEmails.add(e);
+          });
+          (extracted.phones || []).forEach((ph) => allPhones.add(ph));
+
+          if (!bestExtracted.name && extracted.name) bestExtracted.name = extracted.name;
+          if (!bestExtracted.title && extracted.title) bestExtracted.title = extracted.title;
+          if (!bestHtml) bestHtml = html;
+          if (!bestText) bestText = text;
+
+          if (allEmails.size >= 3) break;
+        } catch (err) {}
+      }
+    } catch (err) {
+      console.log(`    → error: ${err.message.slice(0, 50)}`);
+    } finally {
+      try { if (page) await page.close(); } catch (e) {}
+      try { if (context) await context.close(); } catch (e) {}
+    }
+
+    if (allEmails.size === 0) {
+      console.log(`    → 0 emails`);
+      return;
+    }
+
+    const enrichment = enricher.enrichCompany(bestHtml, bestText, {
+      name: resolveCompany(domain.split('.')[0]),
+      domain,
+      location: null,
+    });
+
+    const contacts = [...allEmails].map((email) => ({
+      email,
+      name: bestExtracted.name || null,
+      title: bestExtracted.title || null,
+      phone: [...allPhones][0] || null,
+      confidence: 75,
+      grade: 'B',
+      verified: false,
+      source: 'crawl-selected',
+      sourceUrl: url,
+      company: {
+        name: enrichment.name,
+        domain,
+        industry: enrichment.industry,
+        size: enrichment.size,
+        location: enrichment.location || null,
+        techStack: enrichment.techStack,
+      },
+    }));
+
+    await indexer.bulkIndexContacts(contacts, { generateEmbeddings: false });
+    console.log(`    → ${contacts.length} emails saved`);
+  }
 
   try {
-    const result = await crawlUrls(cleanUrls, req.body.query || "", entityType);
+    browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+    for (const url of urls) {
+      try {
+        await withTimeout(processOneDomain(url), DOMAIN_TIMEOUT, `domain ${url}`);
+      } catch (err) {
+        console.log(`    → HARD TIMEOUT (skipping ${url})`);
+      }
+    }
+  } catch (err) {
+    console.error('[crawl error]', err.message);
+  } finally {
+    if (browser) try { await browser.close(); } catch (e) {}
+  }
+}
+
+// ==================== QUEUE ====================
+let crawlQueue = [];
+let crawlRunning = false;
+
+async function processCrawlQueue() {
+  while (crawlQueue.length > 0) {
+    const batch = crawlQueue.splice(0, 5);
+    try { await crawlUrlsInBackground(batch); } catch (err) { console.error('[queue]', err.message); }
+  }
+  crawlRunning = false;
+  console.log('[queue] All crawl jobs done');
+}
+
+async function startCrawler(url) {
+  crawlQueue.push(url);
+  if (!crawlRunning) { crawlRunning = true; processCrawlQueue(); }
+  return true;
+}
+
+// ==================== TRANSFORM ====================
+function transformRecord(c) {
+  const company = c.company || {};
+  let investorType = 'Investor';
+  const dom = (company.domain || '').toLowerCase();
+  if (dom.includes('capital') || dom.includes('vc') || dom.includes('ventures')) investorType = 'VC';
+  else if (dom.includes('angel')) investorType = 'Angel';
+
+  let region = company.location || '(unknown)';
+  if (region.toLowerCase().includes('delhi')) region = 'Delhi';
+  else if (region.toLowerCase().includes('mumbai')) region = 'Mumbai';
+  else if (region.toLowerCase().includes('bangalore') || region.toLowerCase().includes('bengaluru')) region = 'Bangalore';
+
+  return {
+    name: c.name || '(unknown)',
+    company: company.name || company.domain || '(unknown)',
+    investorType, region,
+    sectors: company.industry ? [company.industry] : [],
+    tags: company.techStack ? company.techStack.slice(0, 3) : [],
+    emails: [c.email].filter(Boolean),
+    linkedin: c.linkedin || null,
+    phones: c.phone ? [c.phone] : [],
+    investorScore: Math.round((c.confidence || 0) * 0.5),
+    emailScore: c.verified ? Math.round(c.confidence || 0) : Math.round((c.confidence || 0) * 0.6),
+    linkedinScore: c.linkedin ? 5 : 0,
+    confidence: c.confidence || 0,
+    grade: c.grade || 'F',
+    source: c.sourceUrl || `https://${company.domain || 'unknown'}`,
+    verified: c.verified || false,
+    domain: company.domain || '',
+  };
+}
+
+function matchSeeds(query) {
+  if (!query) return seedDomains.slice(0, 20);
+  const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 2 && !['the','and','for','with','in','of','on','at','investors','investor'].includes(w));
+  return seedDomains.filter(s => {
+    const text = [(s.domain||''), (s.hq_city||''), (s.region||''), ((s.cities||[]).join(' '))].join(' ').toLowerCase();
+    return words.some(w => text.includes(w));
+  });
+}
+
+// ==================== STATS ====================
+async function getStats() {
+  try {
+    const countResult = await client.count({ index: CONTACTS_INDEX });
+    const total = countResult.count;
+    let verified = 0;
+    try {
+      const v = await client.count({ index: CONTACTS_INDEX, body: { query: { term: { verified: true } } } });
+      verified = v.count;
+    } catch (e) {}
+    let avgConf = 0, byGrade = [];
+    try {
+      const agg = await client.search({
+        index: CONTACTS_INDEX, size: 0,
+        body: { aggs: { avg_c: { avg: { field: 'confidence' } }, grades: { terms: { field: 'grade' } } } },
+      });
+      avgConf = agg.aggregations.avg_c.value || 0;
+      byGrade = agg.aggregations.grades.buckets || [];
+    } catch (e) {}
+    return { total, totalContacts: total, totalVerified: verified, verified, avgConfidence: avgConf, highConfidence: verified, byGrade, emailsFound: total, newCrawl: total, updatedExisting: 0, seedCount: seedDomains.length };
+  } catch (err) {
+    return { total: 0, totalVerified: 0, avgConfidence: 0, byGrade: [], seedCount: seedDomains.length };
+  }
+}
+
+app.get('/api/stats', async (req, res) => res.json(await getStats()));
+app.get('/stats', async (req, res) => res.json(await getStats()));
+
+// ==================== RECORDS ====================
+async function getRecords(limit = 200) {
+  try {
+    const result = await client.search({
+      index: CONTACTS_INDEX, size: limit,
+      body: { query: { match_all: {} }, sort: [{ confidence: 'desc' }] },
+    });
+    return result.hits.hits.map(h => transformRecord(h._source));
+  } catch (err) { return []; }
+}
+
+app.get('/records', async (req, res) => {
+  const records = await getRecords(200);
+  res.json({ records, results: records, count: records.length });
+});
+
+app.get('/api/records', async (req, res) => {
+  const records = await getRecords(200);
+  res.json({ records, results: records, count: records.length });
+});
+
+// ==================== DISCOVER ====================
+app.post('/discover', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const q = (body.query || body.search || body.q || '').trim();
+    console.log(`[discover] "${q}"`);
+
+    const matchedSeeds = matchSeeds(q);
+    console.log(`  Seeds: ${matchedSeeds.length}`);
+
+    let ddgResults = [];
+    if (q) {
+      ddgResults = await searchDDG(q + ' venture capital contact email');
+      console.log(`  DDG: ${ddgResults.length}`);
+    }
+
+    let records = [];
+    if (q) {
+      try {
+        const results = await adv.rankedSearch(q, { size: 100 });
+        records = results.map(transformRecord);
+      } catch (e) { records = await getRecords(100); }
+    } else {
+      records = await getRecords(100);
+    }
+
+    const seedSources = matchedSeeds.map(s => ({
+      domain: s.domain, url: `https://${s.domain}`,
+      city: s.hq_city || '', hq_city: s.hq_city || '',
+      region: s.region || '', cities: s.cities || [],
+      source: 'seed', type: 'VC', name: s.domain, title: s.domain, label: s.domain,
+      description: `${s.hq_city || ''} ${s.region || ''}`.trim(),
+      score: 5, confidence: 75, emails: [], totalEmails: 0, emailCount: 0,
+      sector: 'Venture Capital', website: `https://${s.domain}`,
+    }));
+
+    const ddgSources = ddgResults.map(d => ({
+      domain: d.domain, url: d.url, title: d.title || d.domain,
+      description: d.description || '', name: d.domain, label: d.domain,
+      hq_city: '', city: '', region: '', cities: [],
+      source: 'ddg', type: 'VC', score: 3, confidence: 60,
+      emails: [], totalEmails: 0, emailCount: 0,
+      sector: 'Venture Capital', website: d.url,
+    }));
+
     res.json({
-      sitesCrawled: cleanUrls.length,
-      entityType: entityType,
-      rawCount: result.rawRecords.length,
-      validCount: result.valid.length,
-      invalidCount: result.invalidCount,
-      uniqueCount: result.investors.length,
-      reviewCount: result.reviewQueue.length,
-      results: result.investors
+      success: true, query: q,
+      seed: matchedSeeds.length, ddg: ddgResults.length,
+      totalSources: matchedSeeds.length + ddgResults.length,
+      sources: [...seedSources, ...ddgSources],
+      records, results: records, count: records.length,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Crawl failed: " + err.message });
+    console.error('[discover]', err);
+    res.status(500).json({ success: false, error: err.message, records: [], sources: [], totalSources: 0 });
   }
 });
 
-// ---------- GET /results ----------
-app.get("/results", async (req, res) => {
-  try {
-    if (isConfigured()) {
-      const data = await getAllInvestors();
-      if (data.length > 0) return res.json({ count: data.length, results: data, source: "supabase" });
-    }
-    const p = path.join(__dirname, "crawl-results.json");
-    if (!fs.existsSync(p)) return res.json({ count: 0, results: [] });
-    const data = JSON.parse(fs.readFileSync(p, "utf8"));
-    res.json({ count: data.length, results: data, source: "json" });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+app.get('/discover', async (req, res) => {
+  const q = req.query.q || req.query.query || '';
+  const matchedSeeds = matchSeeds(q);
+  const records = await getRecords(100);
+  const seedSources = matchedSeeds.map(s => ({
+    domain: s.domain, url: `https://${s.domain}`,
+    city: s.hq_city || '', hq_city: s.hq_city || '',
+    region: s.region || '', cities: s.cities || [],
+    source: 'seed', type: 'VC', name: s.domain, title: s.domain, label: s.domain,
+    description: `${s.hq_city || ''} ${s.region || ''}`.trim(),
+    score: 5, confidence: 75, emails: [], totalEmails: 0, emailCount: 0,
+    sector: 'Venture Capital', website: `https://${s.domain}`,
+  }));
+  res.json({
+    success: true, query: q,
+    seed: matchedSeeds.length, ddg: 0,
+    totalSources: matchedSeeds.length,
+    sources: seedSources,
+    records, results: records, count: records.length,
+  });
 });
 
-// ---------- GET /results/all ----------
-app.get("/results/all", async (req, res) => {
-  try {
-    const queryFilter = String(req.query.query || "").trim().toLowerCase();
-    const entityFilter = String(req.query.entityType || "").trim().toLowerCase();
+// ==================== CRAWL ENDPOINTS ====================
+function extractUrls(body) {
+  const urls = [];
+  const candidates = body.domains || body.sources || body.urls || body.selected || [];
+  for (const d of candidates) {
+    if (typeof d === 'string') urls.push(d.startsWith('http') ? d : `https://${d}`);
+    else if (d && d.url) urls.push(d.url);
+    else if (d && d.domain) urls.push(`https://${d.domain}`);
+  }
+  if (body.url) urls.push(body.url.startsWith('http') ? body.url : `https://${body.url}`);
+  return [...new Set(urls)];
+}
 
-    let data = [];
-    if (isConfigured()) {
-      data = await getAllInvestors();
-    } else {
-      const p = path.join(__dirname, "crawl-results.json");
-      if (!fs.existsSync(p)) return res.json({ count: 0, results: [] });
-      data = JSON.parse(fs.readFileSync(p, "utf8"));
-    }
+const crawlEndpoints = ['/crawl','/crawl-selected','/crawl-selected-sources','/crawlSelected','/crawl-bulk','/crawl-urls','/crawl_urls','/crawlSources','/crawl-sources'];
 
-    console.log(`🔍 /results/all query="${queryFilter}" entity="${entityFilter}" total=${data.length}`);
+for (const endpoint of crawlEndpoints) {
+  app.post(endpoint, async (req, res) => {
+    try {
+      const body = req.body || {};
+      const urls = extractUrls(body);
+      console.log(`[${endpoint}] ${urls.length} urls`);
+      if (!urls.length) return res.json({ success: false, error: 'no urls', records: [], started: 0 });
 
-    if (queryFilter) {
-      data = data.filter(r => {
-        const rq = String(r.crawl_query || "").toLowerCase().trim();
-        if (!rq) return false;
-        return rq === queryFilter || rq.includes(queryFilter) || queryFilter.includes(rq);
-      });
-    }
-
-    if (entityFilter) {
-      data = data.filter(r => String(r.entity_type || "investor").toLowerCase() === entityFilter);
-    }
-
-    console.log(`   → matched ${data.length}`);
-    res.json({ count: data.length, results: data, source: isConfigured() ? "supabase" : "json" });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// ---------- POST /reset ----------
-app.post("/reset", async (req, res) => {
-  try {
-    if (fs.existsSync(HISTORY_FILE)) {
-      fs.writeFileSync(HISTORY_FILE, JSON.stringify([], null, 2));
-    }
-
-    const trackerPath = path.join(__dirname, "crawl-tracker.json");
-    if (fs.existsSync(trackerPath)) {
-      fs.writeFileSync(trackerPath, JSON.stringify({}, null, 2));
-    }
-
-    let investorCount = 0;
-    let reviewCount = 0;
-
-    if (isConfigured()) {
-      try {
-        const all = await getAllInvestors();
-        investorCount = all.length;
-      } catch {}
-    } else {
-      const p = path.join(__dirname, "crawl-results.json");
-      if (fs.existsSync(p)) {
-        try { investorCount = JSON.parse(fs.readFileSync(p, "utf8")).length; } catch {}
+      let started = 0;
+      for (const url of urls) {
+        try { await startCrawler(url); started++; } catch (e) {}
       }
+      res.json({ success: true, started, total: urls.length, records: [], message: `${started} crawlers queued.` });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message, records: [], started: 0 });
     }
+  });
+}
 
-    const rqPath = path.join(__dirname, "review-queue.json");
-    if (fs.existsSync(rqPath)) {
-      try { reviewCount = JSON.parse(fs.readFileSync(rqPath, "utf8")).length; } catch {}
-    }
-
-    res.json({
-      success: true,
-      message: "Crawler reset successfully",
-      dataPreserved: { investors: investorCount, review: reviewCount }
-    });
+app.post('/crawl/:anything', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const urls = extractUrls(body);
+    if (!urls.length) return res.json({ success: false, error: 'no urls', records: [], started: 0 });
+    let started = 0;
+    for (const url of urls) { try { await startCrawler(url); started++; } catch (e) {} }
+    res.json({ success: true, started, total: urls.length, records: [] });
   } catch (err) {
-    console.error("Reset error:", err);
+    res.status(500).json({ success: false, error: err.message, records: [], started: 0 });
+  }
+});
+
+app.post('/reset', async (req, res) => {
+  try {
+    await client.deleteByQuery({ index: CONTACTS_INDEX, body: { query: { match_all: {} } }, refresh: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==================== API SEARCH ====================
+app.get('/api/search', async (req, res) => {
+  try {
+    const { q, size = 50 } = req.query;
+    let records;
+    if (q && q.trim()) {
+      const results = await adv.rankedSearch(q, { size: parseInt(size) });
+      records = results.map(transformRecord);
+    } else {
+      records = await getRecords(parseInt(size));
+    }
+    res.json({ count: records.length, results: records, records });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ---------- GET /review ----------
-app.get("/review", (req, res) => {
-  try {
-    const p = path.join(__dirname, "review-queue.json");
-    if (!fs.existsSync(p)) return res.json({ count: 0, results: [] });
-    const data = JSON.parse(fs.readFileSync(p, "utf8"));
-    res.json({ count: data.length, results: data });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+// ==================== DASHBOARD ====================
+app.get(/^(?!\/api).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-
-// ---------- GET /history ----------
-app.get("/history", (req, res) => {
-  res.json({ history: loadHistory() });
-});
-
-// ---------- POST /scheduler/run ----------
-app.post("/scheduler/run", async (req, res) => {
-  try {
-    const rerun = await scheduler.runScheduledCrawl();
-    res.json({ rerun: rerun.length, queries: rerun.map(r => r.query) });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// ---------- GET /health ----------
-app.get("/health", (req, res) => {
-  res.json({
-    status: "ok",
-    service: "Multi-Entity Discovery Crawler",
-    supabase: isConfigured(),
-    ai: ai.aiStatus()
-  });
-});
-
-// ---------- GET /ai/status ----------
-app.get("/ai/status", (req, res) => {
-  res.json(ai.aiStatus());
-});
-
-// ---------- START ----------
-scheduler.startScheduler();
-
-console.log('📡 About to call app.listen on port', PORT);
 
 app.listen(PORT, () => {
-  console.log('✅ Server is listening!');
-  console.log("");
-  console.log("================================");
-  console.log("  MYCRAWLER DATA ENGINE");
-  console.log("================================");
-  console.log(`Open:      http://localhost:${PORT}`);
-  console.log(`Supabase:  ${isConfigured() ? "✅ Connected" : "⚠️  Not configured"}`);
-  console.log(`AI:        Groq ${ai.aiStatus().groq ? "✅" : "❌"} | Gemini ${ai.aiStatus().gemini ? "✅" : "❌"}`);
-  console.log("================================");
-  console.log("");
+  console.log(`\n✅ Server running on http://localhost:${PORT}`);
+  console.log(`   ${seedDomains.length} seed domains loaded`);
+  console.log(`   Debug logger: ON`);
+  console.log(`   Watch for [REQ] lines below\n`);
 });

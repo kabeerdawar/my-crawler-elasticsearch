@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B2B Contact Crawler</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; color: #1a1a1a; line-height: 1.6; }
+  .header { background: #0a2540; color: white; padding: 20px 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .header h1 { font-size: 24px; font-weight: 600; }
+  .header .sub { opacity: 0.7; font-size: 13px; margin-top: 4px; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 30px 40px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 30px; }
+  .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e5e7eb; }
+  .stat-card .label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; color: #0a2540; }
+  .search-box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e5e7eb; margin-bottom: 20px; }
+  .search-row { display: flex; gap: 12px; margin-bottom: 12px; }
+  input[type="text"] { flex: 1; padding: 12px 16px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 15px; outline: none; }
+  input[type="text"]:focus { border-color: #0a2540; }
+  button { padding: 12px 24px; background: #0a2540; color: white; border: none; border-radius: 6px; font-size: 15px; font-weight: 500; cursor: pointer; }
+  button:hover { background: #1a3a5c; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .tab { padding: 6px 14px; background: #f3f4f6; border-radius: 20px; font-size: 13px; cursor: pointer; border: 1px solid transparent; }
+  .tab.active { background: #0a2540; color: white; }
+  .results { background: white; border-radius: 8px; border: 1px solid #e5e7eb; overflow: hidden; }
+  .result-item { padding: 18px 22px; border-bottom: 1px solid #f3f4f6; }
+  .result-item:hover { background: #fafbfc; }
+  .result-item:last-child { border-bottom: none; }
+  .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .result-name { font-size: 16px; font-weight: 600; color: #0a2540; }
+  .result-email { font-size: 13px; color: #6b7280; font-family: monospace; }
+  .result-meta { font-size: 13px; color: #4b5563; margin-top: 4px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .badge-aplus { background: #d1fae5; color: #065f46; }
+  .badge-a { background: #dbeafe; color: #1e40af; }
+  .badge-b { background: #fef3c7; color: #92400e; }
+  .badge-c { background: #fed7aa; color: #9a3412; }
+  .badge-d, .badge-f { background: #fee2e2; color: #991b1b; }
+  .empty { padding: 60px 20px; text-align: center; color: #9ca3af; }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .loading { padding: 40px; text-align: center; color: #6b7280; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #e5e7eb; border-top-color: #0a2540; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .contact-detail { font-size: 12px; color: #9ca3af; margin-top: 6px; }
+  .try { font-size: 13px; color: #6b7280; }
+  .try em { font-style: normal; color: #0a2540; cursor: pointer; margin-right: 12px; padding: 3px 8px; background: #f3f4f6; border-radius: 12px; }
+  .try em:hover { background: #e5e7eb; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>B2B Contact Crawler</h1>
+  <div class="sub">Local B2B contact intelligence — 95%+ verified emails</div>
+</div>
+<div class="container">
+  <div class="stats">
+    <div class="stat-card"><div class="label">Total Contacts</div><div class="value" id="stat-total">—</div></div>
+    <div class="stat-card"><div class="label">Verified</div><div class="value" id="stat-verified">—</div></div>
+    <div class="stat-card"><div class="label">Avg Confidence</div><div class="value" id="stat-avg">—</div></div>
+    <div class="stat-card"><div class="label">A+ Grade</div><div class="value" id="stat-aplus">—</div></div>
+  </div>
+  <div class="search-box">
+    <div class="tabs">
+      <div class="tab active" data-mode="ranked">Keyword</div>
+      <div class="tab" data-mode="semantic">Semantic (AI)</div>
+      <div class="tab" data-mode="filtered">Filtered</div>
+    </div>
+    <div class="search-row">
+      <input type="text" id="search-input" placeholder="Search by name, title, company... (try: fintech CEO)" autocomplete="off">
+      <button id="search-btn" onclick="doSearch()">Search</button>
+    </div>
+    <div class="try">
+      Try:
+      <em onclick="quickSearch('CEO')">CEO software</em>
+      <em onclick="quickSearch('fintech leaders')">fintech leaders</em>
+      <em onclick="quickSearch('engineering executive in India')">engineering exec in India</em>
+    </div>
+  </div>
+  <div class="results" id="results">
+    <div class="empty"><div class="empty-icon">🔍</div><div>Start searching to see results</div></div>
+  </div>
+</div>
+<script>
+let currentMode = 'ranked';
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentMode = tab.dataset.mode;
+  });
+});
+document.getElementById('search-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') doSearch();
+});
+async function loadStats() {
+  try {
+    const res = await fetch('/api/stats');
+    const data = await res.json();
+    document.getElementById('stat-total').textContent = data.total || 0;
+    document.getElementById('stat-verified').textContent = data.totalVerified || 0;
+    document.getElementById('stat-avg').textContent = data.avgConfidence ? data.avgConfidence.toFixed(1) : '—';
+    const aplus = (data.byGrade || []).find(g => g.key === 'A+');
+    document.getElementById('stat-aplus').textContent = aplus ? aplus.doc_count : 0;
+  } catch (err) { console.error('Stats error:', err); }
+}
+function quickSearch(q) { document.getElementById('search-input').value = q; doSearch(); }
+async function doSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  const resultsEl = document.getElementById('results');
+  const btn = document.getElementById('search-btn');
+  if (!q) { resultsEl.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><div>Enter a search query</div></div>'; return; }
+  btn.disabled = true;
+  resultsEl.innerHTML = '<div class="loading"><span class="spinner"></span>Searching...</div>';
+  try {
+    let endpoint;
+    if (currentMode === 'semantic') endpoint = `/api/search/semantic?q=${encodeURIComponent(q)}&size=15`;
+    else if (currentMode === 'filtered') endpoint = `/api/search/filtered?q=${encodeURIComponent(q)}&verified=true&limit=15`;
+    else endpoint = `/api/search?q=${encodeURIComponent(q)}&size=15`;
+    const res = await fetch(endpoint);
+    const data = await res.json();
+    const results = data.results || data.hits || [];
+    if (results.length === 0) { resultsEl.innerHTML = '<div class="empty"><div class="empty-icon">🤷</div><div>No results found</div></div>'; return; }
+    resultsEl.innerHTML = results.map(renderContact).join('');
+  } catch (err) {
+    resultsEl.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div>Error: ${err.message}</div></div>`;
+  } finally { btn.disabled = false; }
+}
+function renderContact(c) {
+  const gradeClass = 'badge-' + (c.grade || 'f').toLowerCase().replace('+', 'plus');
+  const company = c.company || {};
+  const name = c.name || '(no name)';
+  const title = c.title || '(no title)';
+  const companyName = company.name || '(unknown company)';
+  const industry = company.industry ? ` · ${company.industry}` : '';
+  const location = company.location ? ` · ${company.location}` : '';
+  return `
+    <div class="result-item">
+      <div class="result-header">
+        <div>
+          <div class="result-name">${escapeHtml(name)}</div>
+          <div class="result-email">${escapeHtml(c.email || '')}</div>
+        </div>
+        <span class="badge ${gradeClass}">${escapeHtml(c.grade || 'F')} (${c.confidence || 0})</span>
+      </div>
+      <div class="result-meta"><strong>${escapeHtml(title)}</strong> at ${escapeHtml(companyName)}${escapeHtml(industry)}${escapeHtml(location)}</div>
+      <div class="contact-detail">${c.verified ? '✅ Verified' : '⚠️ Unverified'}</div>
+    </div>
+  `;
+}
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+loadStats();
+</script>
+</body>
+</html>

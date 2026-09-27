@@ -1,0 +1,69 @@
+=== SIMPLE CRAWLER (v9 — timeout-safe) ===
+
+Seeds loaded: 83
+Processing: 56 domains
+
+[1/56] northzone.com                1 emails (3.3s)
+   → hello@northzone.com
+[2/56] cherry.vc                    2 emails (2.2s)
+   → press@cherry.vc
+   → opportunity@cherry.vc
+[3/56] punkt.vc                     0 emails (6.0s)
+[4/56] creandum.com                 TIMEOUT (0.0s)
+[5/56] eqtventures.com              TIMEOUT (0.0s)
+[6/56] partechpartners.com          TIMEOUT (0.0s)
+[7/56] seedcamp.com                 TIMEOUT (0.0s)
+[8/56] localglobe.vc                TIMEOUT (0.0s)
+[9/56] octopusventures.com          TIMEOUT (0.0s)
+[10/56] entreecap.com                TIMEOUT (0.0s)
+[11/56] peak.capital                 TIMEOUT (0.0s)
+[12/56] softbank.com                 TIMEOUT (0.0s)
+[13/56] ggvcapital.com               TIMEOUT (0.0s)
+[14/56] vertexventures.com           TIMEOUT (0.0s)
+[15/56] gobi.vc                      TIMEOUT (0.0s)
+[16/56] jungle-ventures.com          TIMEOUT (0.0s)
+[17/56] openspace.vc                 TIMEOUT (0.0s)
+[18/56] wavemaker.com                TIMEOUT (0.0s)
+[19/56] matrixpartners.com.cn        TIMEOUT (0.0s)
+[20/56] hillhouse.com                TIMEOUT (0.0s)
+[21/56] cyberagentventures.com       TIMEOUT (0.0s)
+[22/56] globis.com                   TIMEOUT (0.0s)
+[23/56] monashees.com.br             TIMEOUT (0.0s)
+[24/56] kaszek.com                   TIMEOUT (0.0s)
+[25/56] valorcapitalgroup.com        TIMEOUT (0.0s)
+[26/56] canary.com.br                TIMEOUT (0.0s)
+[27/56] igahub.com                   TIMEOUT (0.0s)
+[28/56] allvp.com                    TIMEOUT (0.0s)
+[29/56] kairossociety.com            TIMEOUT (0.0s)
+[30/56] sawaricapital.com            TIMEOUT (0.0s)
+[31/56] novastarventures.com         TIMEOUT (0.0s)
+[32/56] partechafrica.com            TIMEOUT (0.0s)
+[33/56] 4dxventures.com              TIMEOUT (0.0s)
+[34/56] venturesplatform.com         TIMEOUT (0.0s)
+[35/56] atlascapital.vc              TIMEOUT (0.0s)
+[36/56] knife-capital.com            TIMEOUT (0.0s)
+[37/56] rampersand.vc                TIMEOUT (0.0s)
+[38/56] blackbird.vc                 TIMEOUT (0.0s)
+[39/56] airtree.com                  TIMEOUT (0.0s)
+[40/56] squarepegcap.com             TIMEOUT (0.0s)
+[41/56] blume.vc                     TIMEOUT (0.0s)
+[42/56] kalaari.com                  TIMEOUT (0.0s)
+[43/56] saifpartners.com             TIMEOUT (0.0s)
+[44/56] matrixpartners.in            TIMEOUT (0.0s)
+[45/56] fifty.vc                     TIMEOUT (0.0s)
+[46/56] venturecatalysts.in          TIMEOUT (0.0s)
+[47/56] bharatinnovation.in          TIMEOUT (0.0s)
+[48/56] indianangelnetwork.com       TIMEOUT (0.0s)
+[49/56] waterbridgeventures.com      TIMEOUT (0.0s)
+[50/56] dexterangels.com             TIMEOUT (0.0s)
+[51/56] ianfund.in                   TIMEOUT (0.0s)
+[52/56] crunchbase.com               TIMEOUT (0.0s)
+[53/56] dealroom.co                  TIMEOUT (0.0s)
+[54/56] signal.nfx.com               TIMEOUT (0.0s)
+[55/56] wellfound.com                TIMEOUT (0.0s)
+[56/56] angel.co                     TIMEOUT (0.0s)
+
+=== SUMMARY ===
+Domains processed:   56
+Domains with emails: 2
+Total emails:        3
